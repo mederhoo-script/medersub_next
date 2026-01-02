@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 22, "column": 0}, "map": {"version":3,"sources":["file:///home/mederhoo/vtu/vtu-platform/app/dashboard/finance/page.tsx"],"sourcesContent":["import { redirect } from 'next/navigation';\n\nexport default function FinancePage() {\n    redirect('/dashboard/history');\n}\n"],"names":[],"mappings":";;;;AAAA;AAAA;;AAEe,SAAS;IACpB,IAAA,iMAAQ,EAAC;AACb"}}]
-}
