@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.88.0",
     "axios": "^1.13.2",
     "clsx": "^2.1.1",
+    "es-abstract": "^1.24.1",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.561.0",
     "next": "16.0.10",
@@ -21,6 +22,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -1,0 +1,18 @@
+{
+  "status": 307,
+  "headers": {
+    "location": "/dashboard/history",
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dashboard/layout,_N_T_/dashboard/finance/layout,_N_T_/dashboard/finance/page,_N_T_/dashboard/finance"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/dashboard/finance/__PAGE__",
+    "/dashboard/finance",
+    "/dashboard",
+    "/_index",
+    "/_head"
+  ]
+}

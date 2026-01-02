@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dashboard/layout,_N_T_/dashboard/cable/layout,_N_T_/dashboard/cable/page,_N_T_/dashboard/cable"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/dashboard/cable/__PAGE__",
+    "/dashboard/cable",
+    "/dashboard",
+    "/_index",
+    "/_head"
+  ]
+}

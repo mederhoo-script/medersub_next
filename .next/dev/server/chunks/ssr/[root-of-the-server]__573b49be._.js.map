@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 22, "column": 0}, "map": {"version":3,"sources":["file:///home/mederhoo/vtu/vtu-platform/app/dashboard/settings/page.tsx"],"sourcesContent":["export default function SettingsPage() {\n    return (\n        <div className=\"max-w-2xl mx-auto space-y-6\">\n            <h1 className=\"text-2xl font-bold text-gray-900\">Settings</h1>\n            <h1 className=\"text-2xl  font-bold text-blue-600 tracking-tight\">MEDERSUB</h1>\n            <div className=\"bg-white p-8 rounded-xl border border-gray-100 text-center\">\n                <p className=\"text-gray-500\">Account settings and preferences coming soon.</p>\n            </div>\n        </div>\n    );\n}\n"],"names":[],"mappings":";;;;;;AAAe,SAAS;IACpB,qBACI,8OAAC;QAAI,WAAU;;0BACX,8OAAC;gBAAG,WAAU;0BAAmC;;;;;;0BACjD,8OAAC;gBAAG,WAAU;0BAAmD;;;;;;0BACjE,8OAAC;gBAAI,WAAU;0BACX,cAAA,8OAAC;oBAAE,WAAU;8BAAgB;;;;;;;;;;;;;;;;;AAI7C"}}]
+}

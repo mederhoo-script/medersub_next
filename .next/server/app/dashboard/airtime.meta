@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dashboard/layout,_N_T_/dashboard/airtime/layout,_N_T_/dashboard/airtime/page,_N_T_/dashboard/airtime"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/dashboard/airtime/__PAGE__",
+    "/dashboard/airtime",
+    "/dashboard",
+    "/_index",
+    "/_head"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/dashboard/layout,_N_T_/dashboard/coming-soon/layout,_N_T_/dashboard/coming-soon/page,_N_T_/dashboard/coming-soon"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/dashboard/coming-soon/__PAGE__",
+    "/dashboard/coming-soon",
+    "/dashboard",
+    "/_index",
+    "/_head"
+  ]
+}

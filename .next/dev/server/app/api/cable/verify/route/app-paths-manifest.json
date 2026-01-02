@@ -1,0 +1,3 @@
+{
+  "/api/cable/verify/route": "app/api/cable/verify/route.js"
+}

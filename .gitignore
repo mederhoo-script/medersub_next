@@ -13,9 +13,11 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# pwa
+public/sw.js
+public/workbox-*.js
+public/worker-*.js
+public/sw.js.map
 
 # production
 /build
