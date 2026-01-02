@@ -13,6 +13,10 @@
 # testing
 /coverage
 
+# next.js
+/.next/
+/out/
+
 # pwa
 public/sw.js
 public/workbox-*.js
