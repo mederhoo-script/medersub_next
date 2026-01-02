@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Menu, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -21,9 +22,15 @@ export default function Navbar() {
             <div className="w-full">
                 <div className={`transition-all duration-500 bg-gradient-to-r from-green-800 to-green-500 shadow-lg ${scrolled ? 'py-2' : 'py-4'}`}>
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
-                        <div className="flex-shrink-0 flex items-center gap-3">
-                            <span className="font-bold text-2xl tracking-tight text-white">MEDERSUB</span>
-                        </div>
+                        <Link href="/" className="flex-shrink-0 flex items-center gap-3">
+                            <Image
+                                src="/assets/mlogo.png"
+                                alt="MEDERSUB Logo"
+                                width={120}
+                                height={40}
+                                className="h-10 w-auto object-contain"
+                            />
+                        </Link>
 
                         <div className="hidden md:flex items-center space-x-8">
                             <Link href="/login" className="text-white hover:text-green-100 transition-colors text-sm font-bold uppercase">Login</Link>

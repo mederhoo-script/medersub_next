@@ -5,7 +5,7 @@ import "./globals.css";
 // Using system font checks in CSS/Tailwind instead.
 
 export const metadata: Metadata = {
-  title: "VTU Platform",
+  title: "MEDERSUB VTU",
   description: "Secure Instant Top-up Platform",
 };
 

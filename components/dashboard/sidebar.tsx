@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { Home, History, CreditCard, User, Settings, LogOut, ShieldAlert } from 'lucide-react';
 import clsx from 'clsx';
@@ -41,7 +42,15 @@ export default function Sidebar() {
     return (
         <div className="hidden md:flex flex-col w-64 bg-white border-r border-gray-100 h-screen sticky top-0">
             <div className="p-6">
-                <h1 className="text-2xl font-bold text-blue-600 tracking-tight">MEDERSUB</h1>
+                <Link href="/" className="block">
+                    <Image
+                        src="/assets/mlogo.png"
+                        alt="MEDERSUB Logo"
+                        width={140}
+                        height={45}
+                        className="h-12 w-auto object-contain"
+                    />
+                </Link>
             </div>
 
             <div className="flex-1 overflow-y-auto py-4">
