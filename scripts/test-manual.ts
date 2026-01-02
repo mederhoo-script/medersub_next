@@ -1,6 +1,6 @@
 
 // This is a manual verification script you can use to test the API wrapper logic
-import { inlomax } from './lib/inlomax';
+import { inlomax } from '../lib/inlomax';
 
 async function test() {
     console.log("Testing Inlomax API Wrapper...");
