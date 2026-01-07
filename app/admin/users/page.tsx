@@ -119,7 +119,7 @@ export default function AdminUsersPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'ADMIN' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
                                             {user.role}
                                         </span>
                                     </td>
@@ -190,8 +190,8 @@ export default function AdminUsersPage() {
                                     onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                                 >
-                                    <option value="USER">USER</option>
-                                    <option value="ADMIN">ADMIN</option>
+                                    <option value="user">USER</option>
+                                    <option value="admin">ADMIN</option>
                                 </select>
                             </div>
                             <div>
