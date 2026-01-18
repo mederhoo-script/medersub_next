@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { MessageCircle } from 'lucide-react';
 
 // Removed Google Fonts to prevent network timeouts/warnings in restricted environments.
 // Using system font checks in CSS/Tailwind instead.
@@ -31,6 +32,19 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased font-sans">
         {children}
+        {/* WhatsApp Contact Button - Floating Overlay Button */}
+        <a
+          href="https://wa.me/2348034295030"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fixed bottom-6 right-6 bg-green-500 hover:bg-green-600 text-white p-4 rounded-full shadow-2xl hover:shadow-green-500/50 transition-all duration-300 hover:scale-110 z-[9999] flex items-center gap-2 animate-pulse hover:animate-none"
+          aria-label="Contact us on WhatsApp"
+          style={{
+            boxShadow: '0 10px 40px rgba(34, 197, 94, 0.4), 0 0 0 0 rgba(34, 197, 94, 0.7)',
+          }}
+        >
+          <MessageCircle className="h-6 w-6" />
+        </a>
       </body>
     </html>
   );
