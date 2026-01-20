@@ -105,13 +105,20 @@ NEXT_PUBLIC_MONNIFY_CONTRACT_CODE=YOUR_CONTRACT_CODE
 
 1. Create a new project at [app.supabase.com](https://app.supabase.com)
 2. Go to **Settings > API** and copy your project URL and keys
-3. Run the database migrations:
+3. Set up the database schema:
 
+**Option A: Using Supabase SQL Editor (Recommended)**
+- Go to the SQL Editor in your Supabase dashboard
+- Copy and paste the contents of `supabase/schema.sql`
+- Run the SQL script to create the necessary tables
+
+**Option B: Using Supabase CLI**
 ```bash
-# If you have Supabase CLI installed
-supabase db push
+# Install Supabase CLI (if not already installed)
+npm install -g @supabase/cli
 
-# Or manually run the SQL from supabase/schema.sql in your Supabase SQL Editor
+# Push the schema to your project
+supabase db push
 ```
 
 ### 5. Run Development Server
@@ -207,11 +214,10 @@ Wallet funding is powered by [Monnify](https://monnify.com/), integrated in `app
 
 The application uses Supabase PostgreSQL database with the following main tables:
 
-- **users** – User profiles and wallet balances
-- **transactions** – Transaction history and records
-- **services** – Available VTU services and pricing
+- **profiles** – User profiles with email, full name, role, and wallet balance
+- **transactions** – Transaction history with type, amount, service, and status
 
-See `supabase/schema.sql` for the complete database schema.
+See `supabase/schema.sql` for the database schema including Row Level Security (RLS) policies.
 
 ---
 
