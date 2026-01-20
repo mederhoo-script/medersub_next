@@ -2,6 +2,8 @@
 
 **Medersub** is a modern, full-stack **VTU (Virtual Top-Up) platform** built with **Next.js 16**, **TypeScript**, **Supabase**, and **Tailwind CSS**. It enables users to purchase airtime, data bundles, cable TV subscriptions, pay electricity bills, buy education pins, and more — all from a sleek, fast, and responsive interface.
 
+🔗 **Live**:
+[www.medersub.com.ng](https://www.medersub.com.ng)  
 🔗 **Live Demo**: [medersub.vercel.app](https://medersub.vercel.app)  
 📦 **Repository**: https://github.com/mederhoo-script/medersub_next
 
@@ -279,8 +281,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 License
 
-This project is licensed under the **MIT License** – see the LICENSE file for details.
-
+None
 ---
 
 ## 💬 Support
