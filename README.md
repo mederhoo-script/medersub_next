@@ -172,7 +172,7 @@ medersub_next/
 ├── public/                # Static assets (images, icons)
 ├── supabase/              # Supabase migrations and schema
 ├── next.config.ts         # Next.js configuration
-├── tailwind.config.js     # Tailwind CSS configuration
+├── postcss.config.mjs     # PostCSS & Tailwind CSS v4 configuration
 └── tsconfig.json          # TypeScript configuration
 ```
 
@@ -282,7 +282,6 @@ This project is licensed under the **MIT License** – see the LICENSE file for 
 For questions, issues, or feature requests:
 
 - 🐛 [Open an issue](https://github.com/mederhoo-script/medersub_next/issues)
-- 📧 Contact: [Your support email]
 - 💬 Discussions: [GitHub Discussions](https://github.com/mederhoo-script/medersub_next/discussions)
 
 ---
