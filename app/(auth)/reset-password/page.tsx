@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Lock, Loader2, Eye, EyeOff } from 'lucide-react';
@@ -13,18 +13,6 @@ export default function ResetPasswordPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const router = useRouter();
-
-    useEffect(() => {
-        // Check if user came from a valid password reset email link
-        const checkSession = async () => {
-            const { data } = await supabase.auth.getSession();
-            if (!data.session) {
-                // If no valid session, redirect to forgot password
-                setError('Invalid or expired reset link. Please request a new password reset.');
-            }
-        };
-        checkSession();
-    }, []);
 
     const handlePasswordUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -46,7 +34,7 @@ export default function ResetPasswordPage() {
         }
 
         const { error } = await supabase.auth.updateUser({
-            password: password,
+            password,
         });
 
         if (error) {

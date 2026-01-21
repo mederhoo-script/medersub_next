@@ -92,8 +92,13 @@ npm run dev
 
 Then visit: http://localhost:3000/forgot-password
 
-Note: Make sure your `.env.local` file has the correct Supabase credentials:
+Note: Make sure your `.env.local` file has the correct configuration:
 ```
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
+
+For production, set `NEXT_PUBLIC_SITE_URL` to your production URL:
+- `https://www.medersub.com.ng` or
+- `https://medersub.vercel.app`
