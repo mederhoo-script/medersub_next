@@ -22,7 +22,8 @@
 - **🌐 Internet Bundles** – Purchase specialized internet data plans
 
 ### 🔐 User Features
-- **Secure Authentication** – Powered by Supabase Auth
+- **Secure Authentication** – Powered by Supabase Auth with forgot password functionality
+- **Password Recovery** – Reset forgotten passwords via email
 - **Wallet System** – Fund your wallet via bank transfer or Monnify payment gateway
 - **Transaction History** – Track all your purchases and payments
 - **Profile Management** – Manage your account details
@@ -90,6 +91,9 @@ cp .env.example .env.local
 Then fill in your actual values:
 
 ```env
+# Site URL
+NEXT_PUBLIC_SITE_URL=https://www.medersub.com.ng
+
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
@@ -107,7 +111,14 @@ NEXT_PUBLIC_MONNIFY_CONTRACT_CODE=YOUR_CONTRACT_CODE
 
 1. Create a new project at [app.supabase.com](https://app.supabase.com)
 2. Go to **Settings > API** and copy your project URL and keys
-3. Set up the database schema:
+3. Configure authentication:
+   - Go to **Authentication > URL Configuration**
+   - Add your redirect URLs for password reset:
+     - `https://www.medersub.com.ng/reset-password`
+     - `https://medersub.vercel.app/reset-password`
+     - `http://localhost:3000/reset-password` (for development)
+   - See `FORGOT_PASSWORD_SETUP.md` for detailed password reset configuration
+4. Set up the database schema:
 
 **Option A: Using Supabase SQL Editor (Recommended)**
 - Go to the SQL Editor in your Supabase dashboard
@@ -153,7 +164,11 @@ This creates an optimized production build and starts the production server.
 ```
 medersub_next/
 ├── app/                    # Next.js 16 App Router
-│   ├── (auth)/            # Authentication pages (login, signup)
+│   ├── (auth)/            # Authentication pages
+│   │   ├── login/         # Login page
+│   │   ├── register/      # Registration page
+│   │   ├── forgot-password/ # Forgot password page
+│   │   └── reset-password/  # Reset password page
 │   ├── api/               # API routes
 │   ├── dashboard/         # Main application pages
 │   │   ├── airtime/       # Airtime purchase
