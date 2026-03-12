@@ -31,6 +31,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <script src="https://5gvci.com/act/files/tag.min.js?z=10718066" data-cfasync="false" async></script>
       <script src="https://quge5.com/88/tag.min.js" data-zone="218951" async data-cfasync="false"></script>
       </head>
       <body className="antialiased font-sans">
