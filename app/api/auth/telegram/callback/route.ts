@@ -61,7 +61,12 @@ export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
     const sessionParam = searchParams.get('session')
-    const loginCode = searchParams.get('login_code')
+    let loginCode = searchParams.get('login_code')
+
+    // Also support 'code' parameter for webhook messages
+    if (!loginCode) {
+      loginCode = searchParams.get('code')
+    }
 
     if (loginCode) {
       const response = await setAuthCookiesFromLoginCode(req, loginCode)

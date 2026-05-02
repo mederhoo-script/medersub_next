@@ -159,8 +159,8 @@ export async function POST(req: NextRequest) {
         .insert({ code: loginCode, user_id: userId, temporary_password: tempPassword })
 
       if (!codeError) {
-        const loginUrl = `${appUrl}/api/auth/telegram/callback?login_code=${encodeURIComponent(loginCode)}`
-        await sendTelegramMessage(chatId, `Tap to continue logging in: ${loginUrl}`)
+        const loginUrl = `${appUrl}/api/auth/telegram/callback?code=${encodeURIComponent(loginCode)}`
+        await sendTelegramMessage(chatId, `🔗 Tap here to complete login: ${loginUrl}`)
       }
     }
 
