@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -103,6 +106,10 @@ export default function LoginPage() {
                         >
                             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Sign in'}
                         </button>
+                    </div>
+
+                    <div>
+                        <TelegramButton />
                     </div>
                 </form>
                 <div className="text-center text-sm">

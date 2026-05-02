@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { User, Mail, Phone, Shield } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
 
 export default function ProfilePage() {
     const [profile, setProfile] = useState<any>(null);
@@ -18,6 +21,19 @@ export default function ProfilePage() {
         };
         fetchProfile();
     }, []);
+
+    const handleUnlink = async () => {
+        const res = await fetch('/api/auth/telegram/unlink', { method: 'POST', credentials: 'include' })
+        const json = await res.json()
+        if (json.ok) {
+            // refresh profile
+            const { data: { user } } = await supabase.auth.getUser();
+            const { data } = await supabase.from('profiles').select('*').eq('id', user?.id).single();
+            setProfile(data)
+        } else {
+            alert(json.error || 'Unable to unlink')
+        }
+    }
 
     if (!profile) return <div className="p-8">Loading...</div>;
 
@@ -64,15 +80,33 @@ export default function ProfilePage() {
                 </div>
             </div>
 
-            <button
-                onClick={async () => {
-                    await supabase.auth.signOut();
-                    window.location.href = '/login';
-                }}
-                className="w-full bg-red-50 text-red-600 p-4 rounded-xl font-medium hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-            >
-                Log Out
-            </button>
+            <div className="space-y-3">
+                {profile?.telegram_id ? (
+                    <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
+                        <div>
+                            <p className="text-xs text-gray-500">Telegram</p>
+                            <p className="font-medium text-gray-900">@{profile.telegram_username || profile.telegram_id}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={handleUnlink} className="px-4 py-2 rounded-lg bg-red-50 text-red-600">Unlink</button>
+                        </div>
+                    </div>
+                ) : (
+                    <div>
+                        <TelegramButton label="Link Telegram" />
+                    </div>
+                )}
+
+                <button
+                    onClick={async () => {
+                        await supabase.auth.signOut();
+                        window.location.href = '/login';
+                    }}
+                    className="w-full bg-red-50 text-red-600 p-4 rounded-xl font-medium hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                >
+                    Log Out
+                </button>
+            </div>
         </div>
     );
 }

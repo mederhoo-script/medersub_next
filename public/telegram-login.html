@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Telegram Login</title>
+  </head>
+  <body>
+    <div id="telegram-login"></div>
+
+    <script async src="https://telegram.org/js/telegram-widget.js?15" data-telegram-login="" data-size="large" data-userpic="false" data-radius="6" data-lang="en" data-request-access="write" data-onauth="onTelegramAuth(user)"></script>
+
+    <script>
+      // Replace the widget attributes dynamically since we cannot inline server env here.
+      (function setupWidget(){
+        const bot = window.location.search.split('bot=')[1] || ''
+        const script = document.querySelector('script[src^="https://telegram.org/js/telegram-widget.js"]')
+        if (script && bot) {
+          script.setAttribute('data-telegram-login', bot)
+        }
+      })()
+
+      function onTelegramAuth(user) {
+        try {
+          // Post the user payload to the opener window if exists
+          if (window.opener && typeof window.opener.postMessage === 'function') {
+            window.opener.postMessage({ type: 'telegram_auth', payload: user }, window.location.origin)
+            // Optionally close the popup after a short delay
+            setTimeout(() => window.close(), 500)
+          }
+        } catch (err) {
+          console.error('postMessage failed', err)
+        }
+      }
+    </script>
+
+    <div style="padding:20px;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+      <p>Open in Telegram widget — if nothing happens, ensure you launched this page from the app.</p>
+    </div>
+  </body>
+</html>

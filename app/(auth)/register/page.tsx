@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Lock, Mail, User, Loader2, Eye, EyeOff } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
 
 export default function RegisterPage() {
     const [fullName, setFullName] = useState('');
@@ -144,6 +147,10 @@ export default function RegisterPage() {
                         >
                             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Create Account'}
                         </button>
+                    </div>
+
+                    <div>
+                        <TelegramButton label="Sign up with Telegram" />
                     </div>
                 </form>
                 <div className="text-center text-sm">

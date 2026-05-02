@@ -1,0 +1,186 @@
+import { NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import crypto from 'crypto'
+
+function verifyTelegramPayload(payload: Record<string, any>, botToken: string) {
+  const hash = payload.hash
+  const data: Record<string, any> = { ...payload }
+  delete data.hash
+
+  const keys = Object.keys(data).sort()
+  const data_check_arr: string[] = []
+  for (const key of keys) {
+    data_check_arr.push(`${key}=${data[key]}`)
+  }
+  const data_check_string = data_check_arr.join('\n')
+
+  const secret = crypto.createHash('sha256').update(botToken).digest()
+  const hmac = crypto.createHmac('sha256', secret).update(data_check_string).digest('hex')
+
+  return hmac === hash
+}
+
+function generateTelegramUserEmail(telegramId: string): string {
+  return `telegram_${telegramId}@medersub.local`
+}
+
+function generateSecurePassword(): string {
+  return crypto.randomBytes(16).toString('hex')
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json()
+    const payload = body.payload || body
+
+    if (!payload || !payload.hash) {
+      return NextResponse.json({ error: 'invalid_payload' }, { status: 400 })
+    }
+
+    const botToken = process.env.TELEGRAM_BOT_TOKEN
+    if (!botToken) {
+      return NextResponse.json({ error: 'server_misconfigured' }, { status: 500 })
+    }
+
+    const verified = verifyTelegramPayload(payload, botToken)
+    if (!verified) {
+      return NextResponse.json({ error: 'verification_failed' }, { status: 401 })
+    }
+
+    // Check auth_date to avoid replay attacks (allow 5 minutes)
+    const now = Math.floor(Date.now() / 1000)
+    const authDate = parseInt(String(payload.auth_date || '0'), 10)
+    if (isNaN(authDate) || Math.abs(now - authDate) > 60 * 5) {
+      return NextResponse.json({ error: 'stale_auth_date' }, { status: 400 })
+    }
+
+    // Create a server supabase client that reads cookies from the request
+    const { createServerClient: _ } = await import('@supabase/ssr')
+    const { NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY } = process.env
+    if (!NEXT_PUBLIC_SUPABASE_URL || !NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return NextResponse.json({ error: 'supabase_not_configured' }, { status: 500 })
+    }
+
+    const supabase = createServerClient(
+      NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          getAll() {
+            return (req as any).cookies?.getAll?.() || []
+          },
+          setAll() {
+            return
+          },
+        },
+      }
+    )
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const telegramId = String(payload.id)
+    const telegramUsername = payload.username || null
+
+    // If user is logged in -> link telegram id to their profile
+    if (user) {
+      const { data, error } = await supabaseAdmin
+        .from('profiles')
+        .update({ telegram_id: telegramId, telegram_username: telegramUsername, telegram_linked_at: new Date().toISOString() })
+        .eq('id', user.id)
+        .select()
+        .single()
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
+
+      return NextResponse.json({ ok: true, action: 'linked', profile: data })
+    }
+
+    // Not logged in - check if telegram_id already exists (returning user)
+    const { data: existingProfile, error: lookupError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('telegram_id', telegramId)
+      .single()
+
+    if (!lookupError && existingProfile) {
+      // Telegram user exists - generate login code
+      const loginCode = crypto.randomBytes(12).toString('hex')
+      const { error: codeError } = await supabaseAdmin
+        .from('telegram_login_codes')
+        .insert({
+          code: loginCode,
+          user_id: existingProfile.id,
+        })
+
+      if (codeError) {
+        return NextResponse.json({ error: `Failed to create login code: ${codeError.message}` }, { status: 500 })
+      }
+
+      // Return login code so frontend can exchange for session
+      return NextResponse.json({ ok: true, action: 'login_existing', login_code: loginCode })
+    }
+
+    // New Telegram user - create account and profile
+    const email = generateTelegramUserEmail(telegramId)
+    const password = generateSecurePassword()
+    const fullName = `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || telegramUsername || `User ${telegramId}`
+
+    // Create Supabase auth user
+    const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true, // Auto-confirm since Telegram verified them
+      user_metadata: {
+        full_name: fullName,
+        telegram_id: telegramId,
+        telegram_username: telegramUsername,
+      },
+    })
+
+    if (createError || !authData.user) {
+      return NextResponse.json({ error: `Failed to create user: ${createError?.message}` }, { status: 500 })
+    }
+
+    // Profile is auto-created by the DB trigger, but update with telegram fields
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .update({
+        telegram_id: telegramId,
+        telegram_username: telegramUsername,
+        telegram_linked_at: new Date().toISOString(),
+      })
+      .eq('id', authData.user.id)
+      .select()
+      .single()
+
+    if (profileError) {
+      return NextResponse.json({ error: profileError.message }, { status: 500 })
+    }
+
+    // Generate a one-time login code
+    const loginCode = crypto.randomBytes(12).toString('hex')
+    const { error: codeError } = await supabaseAdmin
+      .from('telegram_login_codes')
+      .insert({
+        code: loginCode,
+        user_id: authData.user.id,
+      })
+
+    if (codeError) {
+      return NextResponse.json({ error: `Failed to create login code: ${codeError.message}` }, { status: 500 })
+    }
+
+    // Return new user info with login code
+    return NextResponse.json({
+      ok: true,
+      action: 'signup_new',
+      user_id: authData.user.id,
+      profile,
+      login_code: loginCode,
+    })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || String(err) }, { status: 500 })
+  }
+}
