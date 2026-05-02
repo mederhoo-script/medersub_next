@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Sign in with email + temporary password to obtain a regular session
-    const email = user?.email
+    const email = (user as any)?.email
     if (!email) {
       return NextResponse.json({ error: 'user_has_no_email' }, { status: 500 })
     }
