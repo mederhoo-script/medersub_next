@@ -93,7 +93,7 @@ export default function ProfilePage() {
                     </div>
                 ) : (
                     <div>
-                        <TelegramButton label="Link Telegram" />
+                        <TelegramButton label="Link Telegram" mode="link" />
                     </div>
                 )}
 

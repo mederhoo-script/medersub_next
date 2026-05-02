@@ -8,9 +8,15 @@ type Props = {
   botUsername?: string
   label?: string
   showOptions?: boolean
+  mode?: 'login' | 'link'
 }
 
-export default function TelegramButton({ botUsername, label = 'Continue with Telegram', showOptions = true }: Props) {
+export default function TelegramButton({
+  botUsername,
+  label = 'Continue with Telegram',
+  showOptions = true,
+  mode = 'login',
+}: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [showDropdown, setShowDropdown] = useState(false)
@@ -84,13 +90,15 @@ export default function TelegramButton({ botUsername, label = 'Continue with Tel
     try {
       const res = await fetch('/api/auth/telegram/bot-link', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
         credentials: 'include',
       })
 
       const json = await res.json()
 
       if (!json.ok || !json.deep_link) {
-        alert('Failed to generate link')
+        alert(json.error || 'Failed to generate link')
         setLoading(false)
         return
       }
