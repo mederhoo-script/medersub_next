@@ -105,13 +105,27 @@ export async function POST(req: Request) {
       .single()
 
     if (!lookupError && existingProfile) {
-      // Telegram user exists - generate login code
+      // Telegram user exists - generate a temporary password + login code
       const loginCode = crypto.randomBytes(12).toString('hex')
+      const tempPassword = generateSecurePassword()
+
+      // Try to set a temporary password for the existing user via admin API
+      try {
+        // Use any-cast to access the admin update method (library typing differences)
+        if ((supabaseAdmin.auth.admin as any)?.updateUserById) {
+          await (supabaseAdmin.auth.admin as any).updateUserById(existingProfile.id, { password: tempPassword })
+        }
+      } catch (err) {
+        // Non-fatal: continue — we'll still store the temporary password with the code
+        console.warn('Failed to update existing user password via admin API', err)
+      }
+
       const { error: codeError } = await supabaseAdmin
         .from('telegram_login_codes')
         .insert({
           code: loginCode,
           user_id: existingProfile.id,
+          temporary_password: tempPassword,
         })
 
       if (codeError) {
@@ -166,6 +180,7 @@ export async function POST(req: Request) {
       .insert({
         code: loginCode,
         user_id: authData.user.id,
+        temporary_password: password,
       })
 
     if (codeError) {
