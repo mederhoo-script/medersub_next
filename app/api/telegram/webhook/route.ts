@@ -10,6 +10,19 @@ function generateSecurePassword(): string {
   return crypto.randomBytes(16).toString('hex')
 }
 
+async function upsertTelegramProfile(
+  userId: string,
+  email: string,
+  fullName: string
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .upsert({ id: userId, email, full_name: fullName, role: 'USER', balance: 0 }, { onConflict: 'id', ignoreDuplicates: true })
+  if (error) {
+    console.warn('[TG webhook] Failed to upsert profile for userId=%s: %s', userId, error.message)
+  }
+}
+
 async function sendTelegramMessage(chatId: number, text: string) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   if (!botToken) return
@@ -172,9 +185,7 @@ export async function POST(req: NextRequest) {
 
             if (orphanedAuthId) {
               userId = orphanedAuthId as string
-              await supabaseAdmin
-                .from('profiles')
-                .upsert({ id: userId, email, full_name: fullName, role: 'USER', balance: 0 }, { onConflict: 'id', ignoreDuplicates: true })
+              await upsertTelegramProfile(userId, email, fullName)
               console.log('[TG webhook] Recovered orphaned auth userId=%s, upserted profile', userId)
             } else {
               console.error('[TG webhook] Failed to create user and no existing profile found:', createError)
@@ -287,9 +298,7 @@ export async function POST(req: NextRequest) {
 
             if (orphanedAuthId) {
               userId = orphanedAuthId as string
-              await supabaseAdmin
-                .from('profiles')
-                .upsert({ id: userId, email, full_name: fullName, role: 'USER', balance: 0 }, { onConflict: 'id', ignoreDuplicates: true })
+              await upsertTelegramProfile(userId, email, fullName)
               console.log('[TG webhook] login_ — recovered orphaned auth userId=%s, upserted profile', userId)
             } else {
               console.error('[TG webhook] login_ — failed to create user and no existing profile found:', createError)
