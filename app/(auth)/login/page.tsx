@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -15,9 +15,14 @@ export default function LoginPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // null = not yet detected (first render), true = inside Telegram, false = normal browser
+    const [isTelegram, setIsTelegram] = useState<boolean | null>(null);
     const router = useRouter();
 
-
+    useEffect(() => {
+        const tg = (window as { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp;
+        setIsTelegram(!!tg?.initData);
+    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -41,10 +46,31 @@ export default function LoginPage() {
         }
     };
 
+    // Inside Telegram Mini App: show a loading screen and let TelegramMiniAppLogin
+    // silently authenticate and redirect to /dashboard. Never show the email/password form.
+    if (isTelegram) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
+                <TelegramMiniAppLogin />
+                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                <p className="text-sm text-gray-500">Signing you in via Telegram…</p>
+            </div>
+        );
+    }
+
+    // isTelegram === null means we haven't detected yet (first paint before useEffect).
+    // Show a neutral loading state so there is no flash of the form inside Telegram.
+    if (isTelegram === null) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
+            </div>
+        );
+    }
+
+    // Normal browser — show the standard login form unchanged.
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
-            {/* Auto-login when opened from Telegram Mini App */}
-            <TelegramMiniAppLogin />
             <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                 <div className="text-center">
                     <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Welcome Back</h2>
