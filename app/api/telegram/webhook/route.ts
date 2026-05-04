@@ -25,27 +25,36 @@ async function sendTelegramMessage(chatId: number, text: string) {
   })
 }
 
-// Verify Telegram bot request signature
-function verifyTelegramRequest(body: string, signature: string | null): boolean {
+// Verify Telegram bot request signature.
+// When registering the webhook you can supply a secret_token via setWebhook; Telegram
+// then echoes that value back verbatim in the X-Telegram-Bot-Api-Secret-Token header.
+// We simply compare the header to the stored secret – no HMAC of the body is involved.
+function verifyTelegramRequest(signature: string | null): boolean {
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
+
+  if (!webhookSecret) {
+    // No secret configured: allow in development, reject in production.
+    console.warn('[TG webhook] TELEGRAM_WEBHOOK_SECRET is not set')
+    return process.env.NODE_ENV !== 'production'
+  }
+
   if (!signature) return false
 
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
-  if (!botToken) return false
-
-  const secret = crypto.createHash('sha256').update(botToken).digest()
-  const hmac = crypto.createHmac('sha256', secret).update(body).digest('hex')
-
-  return hmac === signature
+  try {
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(webhookSecret))
+  } catch {
+    return false
+  }
 }
 
 export async function POST(req: NextRequest) {
   console.log('[TG webhook] POST /api/telegram/webhook called')
   try {
     const body = await req.text()
-    const signature = req.headers.get('x-telegram-bot-api-secret-token') || req.headers.get('x-telegram-bot-api-secret-header')
+    const signature = req.headers.get('x-telegram-bot-api-secret-token')
 
     // Verify request is from Telegram
-    if (!verifyTelegramRequest(body, signature)) {
+    if (!verifyTelegramRequest(signature)) {
       console.error('[TG webhook] Request signature verification failed — signature=%s', signature ? '[present]' : 'missing')
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
