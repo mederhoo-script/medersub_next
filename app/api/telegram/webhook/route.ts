@@ -20,18 +20,28 @@ async function upsertTelegramProfile(
   }
 }
 
-async function sendTelegramMessage(chatId: number, text: string) {
+async function sendTelegramMessage(chatId: number, text: string, webAppUrl?: string) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   if (!botToken) return
+
+  const body: Record<string, any> = {
+    chat_id: chatId,
+    text,
+    disable_web_page_preview: true,
+  }
+
+  if (webAppUrl) {
+    body.reply_markup = {
+      inline_keyboard: [[
+        { text: '🚀 Open App', web_app: { url: webAppUrl } },
+      ]],
+    }
+  }
 
   await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      disable_web_page_preview: true,
-    }),
+    body: JSON.stringify(body),
   })
 }
 
@@ -214,7 +224,8 @@ export async function POST(req: NextRequest) {
         console.log('[TG webhook] Login URL generated for userId=%s: %s', userId, loginUrl)
         await sendTelegramMessage(
           chatId,
-          `👋 Welcome to Medersub!\n\n🔗 Tap the link below to log in to your account:\n${loginUrl}\n\n⏳ This link expires in 15 minutes.`
+          `👋 Welcome to Medersub!\n\n🔗 Tap the link below to log in:\n${loginUrl}\n\n⏳ This link expires in 15 minutes.\n\nOr tap the button below to open the app directly inside Telegram.`,
+          appUrl
         )
       } else {
         console.error('[TG webhook] Failed to insert telegram_login_codes for /start:', codeError)
@@ -310,7 +321,11 @@ export async function POST(req: NextRequest) {
       if (!codeError) {
         const loginUrl = `${appUrl}/api/auth/telegram/callback?code=${encodeURIComponent(loginCode)}`
         console.log('[TG webhook] login_ — login URL for userId=%s: %s', userId, loginUrl)
-        await sendTelegramMessage(chatId, `🔗 Tap here to complete login: ${loginUrl}`)
+        await sendTelegramMessage(
+          chatId,
+          `🔗 Tap here to complete login: ${loginUrl}\n\nOr tap the button below to open the app directly inside Telegram.`,
+          appUrl
+        )
       } else {
         console.error('[TG webhook] login_ — failed to insert login code:', codeError)
         await sendTelegramMessage(chatId, '❌ Failed to generate login link. Please try again.')

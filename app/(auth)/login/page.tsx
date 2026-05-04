@@ -7,6 +7,7 @@ import { Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
+const TelegramMiniAppLogin = dynamic(() => import('@/components/auth/telegram-miniapp-login'), { ssr: false });
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -42,6 +43,8 @@ export default function LoginPage() {
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
+            {/* Auto-login when opened from Telegram Mini App */}
+            <TelegramMiniAppLogin />
             <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                 <div className="text-center">
                     <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Welcome Back</h2>
