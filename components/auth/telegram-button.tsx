@@ -29,8 +29,14 @@ export default function TelegramButton({
 
   useEffect(() => {
     function handleMessage(e: MessageEvent) {
-      if (!e.origin || e.origin !== window.location.origin) return
+      if (!e.origin || e.origin !== window.location.origin) {
+        if (e.data?.type === 'telegram_auth') {
+          console.warn('[TG button] Received telegram_auth message from unexpected origin:', e.origin)
+        }
+        return
+      }
       if (e.data?.type === 'telegram_auth' && e.data.payload) {
+        console.log('[TG button] Received telegram_auth postMessage from popup')
         handleTelegramAuth(e.data.payload)
       }
     }
@@ -40,9 +46,11 @@ export default function TelegramButton({
   }, [])
 
   const handleTelegramAuth = async (payload: Record<string, any>) => {
+    console.log('[TG button] handleTelegramAuth called, payload keys:', Object.keys(payload))
     setLoading(true)
     try {
       // Send the payload to server to verify and link/create account
+      console.log('[TG button] POST /api/auth/telegram/verify ...')
       const res = await fetch('/api/auth/telegram/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -51,29 +59,37 @@ export default function TelegramButton({
       })
 
       const json = await res.json()
+      console.log('[TG button] /api/auth/telegram/verify response status=%d, body=%o', res.status, json)
 
       if (!json.ok) {
+        console.error('[TG button] Verify failed:', json.error)
         alert(json.error || 'Telegram verification failed')
         setLoading(false)
         return
       }
 
       // Handle different response actions
+      console.log('[TG button] action=%s', json.action)
       if (json.action === 'linked') {
         // Already logged in user linked their telegram account
+        console.log('[TG button] Account linked — reloading page')
         window.location.reload()
       } else if (json.action === 'signup_new' || json.action === 'login_existing') {
         // New user created or existing telegram user logging in
         // Exchange login_code for session
         if (json.login_code) {
+          console.log('[TG button] Exchanging login_code for session...')
           await exchangeLoginCode(json.login_code)
         } else {
+          console.error('[TG button] No login_code in response for action=%s', json.action)
           alert('Login failed. Please try again.')
           setLoading(false)
         }
+      } else {
+        console.warn('[TG button] Unknown action:', json.action)
       }
     } catch (err) {
-      console.error(err)
+      console.error('[TG button] Network/fetch error in handleTelegramAuth:', err)
       alert('Network error while verifying Telegram')
       setLoading(false)
     }
@@ -82,12 +98,15 @@ export default function TelegramButton({
   const openWidgetPopup = () => {
     const bot = botUsername || (process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || '')
     const url = `/telegram-login.html${bot ? '?bot=' + encodeURIComponent(bot) : ''}`
+    console.log('[TG button] Opening widget popup:', url)
     window.open(url, 'telegram_login', 'width=520,height=640')
   }
 
   const openBotDeepLink = async () => {
+    console.log('[TG button] openBotDeepLink called, mode=%s', mode)
     setLoading(true)
     try {
+      console.log('[TG button] POST /api/auth/telegram/bot-link ...')
       const res = await fetch('/api/auth/telegram/bot-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,23 +115,27 @@ export default function TelegramButton({
       })
 
       const json = await res.json()
+      console.log('[TG button] /api/auth/telegram/bot-link response status=%d, body=%o', res.status, json)
 
       if (!json.ok || !json.deep_link) {
+        console.error('[TG button] bot-link failed:', json.error)
         alert(json.error || 'Failed to generate link')
         setLoading(false)
         return
       }
 
       // Open the deep link
+      console.log('[TG button] Redirecting to deep link:', json.deep_link)
       window.location.href = json.deep_link
     } catch (err) {
-      console.error(err)
+      console.error('[TG button] Network/fetch error in openBotDeepLink:', err)
       alert('Network error generating link')
       setLoading(false)
     }
   }
 
   const handleClick = () => {
+    console.log('[TG button] handleClick — isMobile=%s, showOptions=%s', isMobile, showOptions)
     if (showOptions && isMobile) {
       setShowDropdown(!showDropdown)
     } else if (isMobile) {
@@ -125,7 +148,9 @@ export default function TelegramButton({
   }
 
   const exchangeLoginCode = async (loginCode: string) => {
+    console.log('[TG button] exchangeLoginCode called, code length=%d', loginCode.length)
     try {
+      console.log('[TG button] POST /api/auth/telegram/session ...')
       const res = await fetch('/api/auth/telegram/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -134,8 +159,10 @@ export default function TelegramButton({
       })
 
       const json = await res.json()
+      console.log('[TG button] /api/auth/telegram/session response status=%d, ok=%s, hasSession=%s', res.status, json.ok, !!json.session)
 
       if (!json.ok || !json.session) {
+        console.error('[TG button] Session exchange failed:', json.error)
         alert('Login failed. Please try again.')
         setLoading(false)
         return
@@ -143,9 +170,11 @@ export default function TelegramButton({
 
       // We have session tokens - redirect to callback handler
       const encodedSession = btoa(JSON.stringify(json.session))
-      window.location.href = `/api/auth/telegram/callback?session=${encodedSession}`
+      const callbackUrl = `/api/auth/telegram/callback?session=${encodedSession}`
+      console.log('[TG button] Redirecting to callback:', callbackUrl.split('?')[0] + '?session=[encoded]')
+      window.location.href = callbackUrl
     } catch (err) {
-      console.error(err)
+      console.error('[TG button] Network/fetch error in exchangeLoginCode:', err)
       alert('Network error during login')
       setLoading(false)
     }

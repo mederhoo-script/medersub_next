@@ -39,16 +39,19 @@ function verifyTelegramRequest(body: string, signature: string | null): boolean 
 }
 
 export async function POST(req: NextRequest) {
+  console.log('[TG webhook] POST /api/telegram/webhook called')
   try {
     const body = await req.text()
     const signature = req.headers.get('x-telegram-bot-api-secret-token') || req.headers.get('x-telegram-bot-api-secret-header')
 
     // Verify request is from Telegram
     if (!verifyTelegramRequest(body, signature)) {
+      console.error('[TG webhook] Request signature verification failed — signature=%s', signature ? '[present]' : 'missing')
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
 
     const update = JSON.parse(body)
+    console.log('[TG webhook] Update received — update_id=%s, message_text=%s', update.update_id, update.message?.text ?? '(no text)')
 
     const text = update.message?.text || ''
     const telegramId = String(update.message?.from?.id || '')
@@ -57,9 +60,12 @@ export async function POST(req: NextRequest) {
     const lastName = update.message?.from?.last_name || ''
     const chatId = update.message?.chat?.id
 
+    console.log('[TG webhook] From — telegramId=%s, username=%s, chatId=%s', telegramId, telegramUsername, chatId)
+
     // Handle /start command with link_<code>
     if (text.startsWith('/start link_')) {
       const code = text.replace('/start link_', '')
+      console.log('[TG webhook] Handling /start link_ code=%s', code)
 
       // Look up the linking code
       const { data: linkData, error: linkError } = await supabaseAdmin
@@ -69,11 +75,13 @@ export async function POST(req: NextRequest) {
         .single()
 
       if (linkError || !linkData) {
+        console.error('[TG webhook] link_ code not found:', linkError?.message ?? 'no data')
         return NextResponse.json({ ok: true }) // Silent fail
       }
 
       // Check if code expired
       if (new Date(linkData.expires_at) < new Date()) {
+        console.error('[TG webhook] link_ code expired at %s', linkData.expires_at)
         // Delete expired code
         await supabaseAdmin.from('telegram_links').delete().eq('code', code)
         return NextResponse.json({ ok: true })
@@ -89,17 +97,18 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', linkData.user_id)
 
-      if (!updateError) {
+      if (updateError) {
+        console.error('[TG webhook] Failed to link telegram to profile (user_id=%s):', linkData.user_id, updateError)
+      } else {
+        console.log('[TG webhook] Telegram linked to user_id=%s', linkData.user_id)
         // Delete the used code
         await supabaseAdmin.from('telegram_links').delete().eq('code', code)
-
-        // Send confirmation message to user (optional)
-        // You can send a message back via Telegram API if you want
       }
     }
 
     // Handle plain /start command - auto-create account and send login link
     if (text === '/start' && chatId && telegramId) {
+      console.log('[TG webhook] Handling plain /start for telegramId=%s', telegramId)
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
       const tempPassword = generateSecurePassword()
 
@@ -110,12 +119,15 @@ export async function POST(req: NextRequest) {
         .eq('telegram_id', telegramId)
         .single()
 
+      console.log('[TG webhook] Existing profile for telegramId=%s: %s', telegramId, existingProfile?.id ?? 'none')
+
       let userId = existingProfile?.id || null
 
       if (!userId) {
         // New user: create a Supabase account
         const email = generateTelegramUserEmail(telegramId)
         const fullName = `${firstName} ${lastName}`.trim() || telegramUsername || `User ${telegramId}`
+        console.log('[TG webhook] Creating new user — email=%s, fullName=%s', email, fullName)
 
         const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
           email,
@@ -129,11 +141,13 @@ export async function POST(req: NextRequest) {
         })
 
         if (createError || !authData.user) {
+          console.error('[TG webhook] Failed to create user:', createError)
           await sendTelegramMessage(chatId, '❌ Failed to create your account. Please try again later.')
           return NextResponse.json({ ok: true })
         }
 
         userId = authData.user.id
+        console.log('[TG webhook] New user created — userId=%s', userId)
 
         await supabaseAdmin
           .from('profiles')
@@ -145,12 +159,16 @@ export async function POST(req: NextRequest) {
           .eq('id', userId)
       } else {
         // Existing user: update the temporary password so they can sign in
+        console.log('[TG webhook] Existing user — updating temp password for userId=%s', userId)
         try {
           if ((supabaseAdmin.auth.admin as any)?.updateUserById) {
             await (supabaseAdmin.auth.admin as any).updateUserById(userId, { password: tempPassword })
+            console.log('[TG webhook] Temp password updated for userId=%s', userId)
+          } else {
+            console.warn('[TG webhook] updateUserById not available on admin API')
           }
         } catch (err) {
-          console.warn('Failed to set login password', err)
+          console.warn('[TG webhook] Failed to set login password', err)
         }
       }
 
@@ -162,12 +180,13 @@ export async function POST(req: NextRequest) {
 
       if (!codeError) {
         const loginUrl = `${appUrl}/api/auth/telegram/callback?code=${encodeURIComponent(loginCode)}`
+        console.log('[TG webhook] Login URL generated for userId=%s: %s', userId, loginUrl)
         await sendTelegramMessage(
           chatId,
           `👋 Welcome to Medersub!\n\n🔗 Tap the link below to log in to your account:\n${loginUrl}\n\n⏳ This link expires in 15 minutes.`
         )
       } else {
-        console.error('Failed to insert telegram_login_codes for /start:', codeError)
+        console.error('[TG webhook] Failed to insert telegram_login_codes for /start:', codeError)
         await sendTelegramMessage(chatId, '❌ Failed to generate login link. Please try again.')
       }
 
@@ -177,6 +196,7 @@ export async function POST(req: NextRequest) {
     // Handle /start command with login_<code>
     if (text.startsWith('/start login_') && chatId && telegramId) {
       const code = text.replace('/start login_', '')
+      console.log('[TG webhook] Handling /start login_ code=%s for telegramId=%s', code, telegramId)
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
       const tempPassword = generateSecurePassword()
 
@@ -187,11 +207,14 @@ export async function POST(req: NextRequest) {
         .eq('telegram_id', telegramId)
         .single()
 
+      console.log('[TG webhook] login_ — existing profile: %s', existingProfile?.id ?? 'none')
+
       let userId = existingProfile?.id || null
 
       if (!userId) {
         const email = generateTelegramUserEmail(telegramId)
         const fullName = `${firstName} ${lastName}`.trim() || telegramUsername || `User ${telegramId}`
+        console.log('[TG webhook] login_ — creating new user email=%s', email)
 
         const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
           email,
@@ -205,10 +228,12 @@ export async function POST(req: NextRequest) {
         })
 
         if (createError || !authData.user) {
+          console.error('[TG webhook] login_ — failed to create user:', createError)
           return NextResponse.json({ ok: true })
         }
 
         userId = authData.user.id
+        console.log('[TG webhook] login_ — new user created userId=%s', userId)
 
         await supabaseAdmin
           .from('profiles')
@@ -225,9 +250,12 @@ export async function POST(req: NextRequest) {
       try {
         if ((supabaseAdmin.auth.admin as any)?.updateUserById) {
           await (supabaseAdmin.auth.admin as any).updateUserById(userId, { password: tempPassword })
+          console.log('[TG webhook] login_ — temp password set for userId=%s', userId)
+        } else {
+          console.warn('[TG webhook] updateUserById not available on admin API')
         }
       } catch (err) {
-        console.warn('Failed to set login password', err)
+        console.warn('[TG webhook] login_ — Failed to set login password', err)
       }
 
       const { error: codeError } = await supabaseAdmin
@@ -236,13 +264,16 @@ export async function POST(req: NextRequest) {
 
       if (!codeError) {
         const loginUrl = `${appUrl}/api/auth/telegram/callback?code=${encodeURIComponent(loginCode)}`
+        console.log('[TG webhook] login_ — login URL for userId=%s: %s', userId, loginUrl)
         await sendTelegramMessage(chatId, `🔗 Tap here to complete login: ${loginUrl}`)
+      } else {
+        console.error('[TG webhook] login_ — failed to insert login code:', codeError)
       }
     }
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
-    console.error('Telegram webhook error:', err)
+    console.error('[TG webhook] Unhandled exception:', err)
     return NextResponse.json({ ok: true }) // Always return 200 to avoid retries
   }
 }
