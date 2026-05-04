@@ -149,14 +149,29 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        if (createError || !authData.user) {
-          console.error('[TG webhook] Failed to create user:', createError)
-          await sendTelegramMessage(chatId, '❌ Failed to create your account. Please try again later.')
-          return NextResponse.json({ ok: true })
-        }
+        if (createError || !authData?.user) {
+          // createUser can fail when an orphaned auth record already exists for this email
+          // (e.g. the trigger ran on a previous attempt but telegram_id was never saved to the profile).
+          // Fall back to finding the existing profile row by email.
+          console.warn('[TG webhook] createUser failed (%s) — falling back to profile lookup by email', createError?.message)
+          const { data: profileByEmail } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .single()
 
-        userId = authData.user.id
-        console.log('[TG webhook] New user created — userId=%s', userId)
+          if (profileByEmail?.id) {
+            userId = profileByEmail.id
+            console.log('[TG webhook] Recovered existing userId=%s via email lookup', userId)
+          } else {
+            console.error('[TG webhook] Failed to create user and no existing profile found:', createError)
+            await sendTelegramMessage(chatId, '❌ Failed to create your account. Please try again later.')
+            return NextResponse.json({ ok: true })
+          }
+        } else {
+          userId = authData.user.id
+          console.log('[TG webhook] New user created — userId=%s', userId)
+        }
 
         await supabaseAdmin
           .from('profiles')
@@ -236,13 +251,27 @@ export async function POST(req: NextRequest) {
           },
         })
 
-        if (createError || !authData.user) {
-          console.error('[TG webhook] login_ — failed to create user:', createError)
-          return NextResponse.json({ ok: true })
-        }
+        if (createError || !authData?.user) {
+          // createUser can fail when an orphaned auth record already exists for this email.
+          // Fall back to finding the existing profile row by email.
+          console.warn('[TG webhook] login_ — createUser failed (%s) — falling back to profile lookup by email', createError?.message)
+          const { data: profileByEmail } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .single()
 
-        userId = authData.user.id
-        console.log('[TG webhook] login_ — new user created userId=%s', userId)
+          if (profileByEmail?.id) {
+            userId = profileByEmail.id
+            console.log('[TG webhook] login_ — recovered existing userId=%s via email lookup', userId)
+          } else {
+            console.error('[TG webhook] login_ — failed to create user and no existing profile found:', createError)
+            return NextResponse.json({ ok: true })
+          }
+        } else {
+          userId = authData.user.id
+          console.log('[TG webhook] login_ — new user created userId=%s', userId)
+        }
 
         await supabaseAdmin
           .from('profiles')
