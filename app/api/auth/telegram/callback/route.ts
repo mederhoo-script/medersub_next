@@ -2,56 +2,59 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 async function setAuthCookiesFromLoginCode(req: NextRequest, loginCode: string) {
-  console.log('[TG callback] setAuthCookiesFromLoginCode — looking up code (length=%d)', loginCode.length)
+  console.log('[Telegram/callback] Looking up login code from URL parameter')
   const { data: codeData, error: codeError } = await supabaseAdmin
     .from('telegram_login_codes')
     .select('user_id, expires_at, temporary_password')
     .eq('code', loginCode)
     .single()
 
+  console.log('[Telegram/callback] Login code lookup — found:', !!codeData, 'error:', codeError?.message ?? null)
+
   if (codeError || !codeData) {
-    console.error('[TG callback] Login code not found in DB:', codeError?.message ?? 'no data')
+    console.error('[Telegram/callback] Login code not found or lookup error')
     return null
   }
 
-  console.log('[TG callback] Code found — user_id=%s, expires_at=%s', codeData.user_id, codeData.expires_at)
-
-  if (new Date(codeData.expires_at) < new Date()) {
-    console.error('[TG callback] Login code expired at %s', codeData.expires_at)
+  const isExpired = new Date(codeData.expires_at) < new Date()
+  console.log('[Telegram/callback] Code expires_at:', codeData.expires_at, 'is expired:', isExpired)
+  if (isExpired) {
     await supabaseAdmin.from('telegram_login_codes').delete().eq('code', loginCode)
+    console.error('[Telegram/callback] Login code has expired')
     return null
   }
 
   const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(codeData.user_id)
+  console.log('[Telegram/callback] User lookup — found:', !!user, 'error:', userError?.message ?? null)
   if (userError || !user) {
-    console.error('[TG callback] User not found for user_id=%s:', codeData.user_id, userError?.message)
+    console.error('[Telegram/callback] User not found for id:', codeData.user_id)
     return null
   }
 
   const tempPassword = (codeData as any).temporary_password
   const email = (user as any)?.email
-  console.log('[TG callback] User found — email=%s, hasTempPassword=%s', email, !!tempPassword)
+  console.log('[Telegram/callback] tempPassword present:', !!tempPassword, 'email present:', !!email)
   if (!tempPassword || !email) {
-    console.error('[TG callback] Missing tempPassword or email — cannot sign in')
+    console.error('[Telegram/callback] Missing tempPassword or email')
     return null
   }
 
-  console.log('[TG callback] Attempting signInWithPassword for email=%s', email)
+  console.log('[Telegram/callback] Attempting signInWithPassword for email:', email)
   const signInResult = await (supabaseAdmin.auth as any).signInWithPassword({
     email,
     password: tempPassword,
   })
 
   const session = signInResult?.data?.session
-  console.log('[TG callback] signInWithPassword — hasSession=%s, error=%s', !!session, signInResult?.error?.message ?? 'none')
+  console.log('[Telegram/callback] signInWithPassword — session present:', !!session, 'error:', signInResult?.error?.message ?? null)
   if (!session) {
-    console.error('[TG callback] Session creation failed:', signInResult?.error)
+    console.error('[Telegram/callback] Session creation failed')
     return null
   }
 
   await supabaseAdmin.from('telegram_login_codes').delete().eq('code', loginCode)
 
-  console.log('[TG callback] Setting auth cookies and redirecting to /dashboard')
+  console.log('[Telegram/callback] Setting auth cookies and redirecting to /dashboard')
   const response = NextResponse.redirect(new URL('/dashboard', req.url))
   response.cookies.set('sb-access-token', session.access_token, {
     httpOnly: true,
@@ -70,7 +73,6 @@ async function setAuthCookiesFromLoginCode(req: NextRequest, loginCode: string) 
 }
 
 export async function GET(req: NextRequest) {
-  console.log('[TG callback] GET /api/auth/telegram/callback called, url=%s', req.nextUrl.toString())
   try {
     const searchParams = req.nextUrl.searchParams
     const sessionParam = searchParams.get('session')
@@ -81,17 +83,18 @@ export async function GET(req: NextRequest) {
       loginCode = searchParams.get('code')
     }
 
-    console.log('[TG callback] Params — loginCode=%s, sessionParam=%s', loginCode ? `[length:${loginCode.length}]` : null, sessionParam ? '[present]' : null)
+    console.log('[Telegram/callback] GET request — session param present:', !!sessionParam, 'login_code present:', !!loginCode)
 
     if (loginCode) {
+      console.log('[Telegram/callback] Processing login_code from URL')
       const response = await setAuthCookiesFromLoginCode(req, loginCode)
       if (response) return response
-      console.error('[TG callback] setAuthCookiesFromLoginCode returned null — redirecting to /login')
+      console.error('[Telegram/callback] Failed to exchange login_code, redirecting to /login')
       return NextResponse.redirect(new URL('/login', req.url))
     }
 
     if (!sessionParam) {
-      console.error('[TG callback] No loginCode or session param — redirecting to /login')
+      console.error('[Telegram/callback] No session or login_code param, redirecting to /login')
       return NextResponse.redirect(new URL('/login', req.url))
     }
 
@@ -99,14 +102,13 @@ export async function GET(req: NextRequest) {
     let sessionData
     try {
       sessionData = JSON.parse(atob(sessionParam))
-      console.log('[TG callback] Decoded session — hasAccessToken=%s, hasRefreshToken=%s', !!sessionData?.access_token, !!sessionData?.refresh_token)
+      console.log('[Telegram/callback] Decoded session data — access_token present:', !!sessionData?.access_token, 'refresh_token present:', !!sessionData?.refresh_token)
     } catch {
-      console.error('[TG callback] Failed to decode session param base64/JSON')
+      console.error('[Telegram/callback] Failed to decode session param')
       return NextResponse.redirect(new URL('/login', req.url))
     }
 
     // Create response with redirect
-    console.log('[TG callback] Setting cookies from session param and redirecting to /dashboard')
     const response = NextResponse.redirect(new URL('/dashboard', req.url))
 
     // Set auth cookies
@@ -128,9 +130,10 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    console.log('[Telegram/callback] Auth cookies set, redirecting to /dashboard')
     return response
   } catch (err: any) {
-    console.error('[TG callback] Unhandled exception:', err)
+    console.error('[Telegram/callback] Unhandled exception:', err)
     return NextResponse.redirect(new URL('/login', req.url))
   }
 }
