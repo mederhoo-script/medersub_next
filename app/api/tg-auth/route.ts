@@ -173,7 +173,9 @@ export async function POST(req: NextRequest) {
           userId = profileByEmail.id
           console.log('[tg-auth] Recovered userId=%s via email lookup', userId)
         } else {
-          // Fallback 2: auth.users row (orphaned — no profile row yet)
+          // Fallback 2: auth.users row (orphaned — no profile row yet).
+          // get_auth_user_id_by_email is defined in
+          // supabase/migrations/009_get_auth_user_id_by_email.sql
           const { data: orphanedAuthId } = await supabaseAdmin
             .rpc('get_auth_user_id_by_email', { p_email: email })
 
@@ -197,12 +199,19 @@ export async function POST(req: NextRequest) {
       await ensureProfileRow(userId, email, fullName, telegramId, telegramUsername)
     }
 
-    // 6. Create a Supabase session for the user (admin, no password needed)
+    // 6. Create a Supabase session for the user (admin, no password needed).
+    // createSession is available on the admin client but is not yet in the
+    // public @supabase/supabase-js type definitions — type it explicitly.
     console.log('[tg-auth] Creating session for userId=%s', userId)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: sessionData, error: sessionError } = await (supabaseAdmin.auth.admin as any).createSession({
-      user_id: userId,
-    })
+    type AdminWithCreateSession = typeof supabaseAdmin.auth.admin & {
+      createSession: (opts: { user_id: string }) => Promise<{
+        data: { session: { access_token: string; refresh_token: string; expires_in: number } | null }
+        error: { message: string } | null
+      }>
+    }
+    const { data: sessionData, error: sessionError } = await (
+      supabaseAdmin.auth.admin as AdminWithCreateSession
+    ).createSession({ user_id: userId })
 
     if (sessionError || !sessionData?.session) {
       console.error('[tg-auth] Session creation failed:', sessionError?.message)
