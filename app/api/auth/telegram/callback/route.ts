@@ -25,7 +25,8 @@ async function setAuthCookiesFromLoginCode(req: NextRequest, loginCode: string) 
   }
 
   console.log('[Telegram/callback] Creating session for user_id:', codeData.user_id)
-  const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: sessionData, error: sessionError } = await (supabaseAdmin.auth.admin as any).createSession({
     user_id: codeData.user_id,
   })
 

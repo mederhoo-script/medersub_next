@@ -175,7 +175,8 @@ export async function POST(req: NextRequest) {
 
     // Create admin session — no password needed
     console.log('[Telegram/miniapp] Creating session for userId=%s', userId)
-    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: sessionData, error: sessionError } = await (supabaseAdmin.auth.admin as any).createSession({
       user_id: userId,
     })
 
