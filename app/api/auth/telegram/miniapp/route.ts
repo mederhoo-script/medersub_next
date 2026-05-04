@@ -49,6 +49,9 @@ async function upsertTelegramProfile(
 
 export async function POST(req: NextRequest) {
   console.log('[Telegram/miniapp] POST /api/auth/telegram/miniapp called')
+
+  const MAX_AUTH_DATE_AGE_SECONDS = 3600 // 1 hour
+
   try {
     const body = await req.json().catch(() => ({}))
     const initData: string = body?.init_data || ''
@@ -77,7 +80,7 @@ export async function POST(req: NextRequest) {
     const authDate = parseInt(params.get('auth_date') || '0', 10)
     const now = Math.floor(Date.now() / 1000)
     console.log('[Telegram/miniapp] auth_date=%d, now=%d, diff=%d', authDate, now, now - authDate)
-    if (!authDate || now - authDate > 3600) {
+    if (!authDate || now - authDate > MAX_AUTH_DATE_AGE_SECONDS) {
       console.error('[Telegram/miniapp] auth_date is stale or missing')
       return NextResponse.json({ error: 'stale_auth_date' }, { status: 400 })
     }
