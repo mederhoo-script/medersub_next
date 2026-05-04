@@ -50,7 +50,7 @@ async function upsertTelegramProfile(
 export async function POST(req: NextRequest) {
   console.log('[Telegram/miniapp] POST /api/auth/telegram/miniapp called')
 
-  const MAX_AUTH_DATE_AGE_SECONDS = 300 // 5 minutes (Telegram recommendation)
+  const MAX_AUTH_DATE_AGE_SECONDS = 86_400 // 24 hours (Telegram Mini App sessions are long-lived)
 
   try {
     const body = await req.json().catch(() => ({}))
