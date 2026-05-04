@@ -25,10 +25,6 @@ function generateTelegramUserEmail(telegramId: string): string {
   return `telegram_${telegramId}@medersub.local`
 }
 
-function generateSecurePassword(): string {
-  return crypto.randomBytes(16).toString('hex')
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json()
@@ -64,7 +60,6 @@ export async function POST(req: Request) {
     }
 
     // Create a server supabase client that reads cookies from the request
-    const { createServerClient: _ } = await import('@supabase/ssr')
     const { NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY } = process.env
     if (!NEXT_PUBLIC_SUPABASE_URL || !NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       console.error('[Telegram/verify] Supabase env vars not configured')
@@ -119,30 +114,12 @@ export async function POST(req: Request) {
       .single()
 
     if (!lookupError && existingProfile) {
-      console.log('[Telegram/verify] Existing profile found — generating login code for user:', existingProfile.id)
-      // Telegram user exists - generate a temporary password + login code
+      console.log('[Telegram/verify] Existing profile found — creating session for user:', existingProfile.id)
       const loginCode = crypto.randomBytes(12).toString('hex')
-      const tempPassword = generateSecurePassword()
-
-      // Try to set a temporary password for the existing user via admin API
-      try {
-        // Use any-cast to access the admin update method (library typing differences)
-        if ((supabaseAdmin.auth.admin as any)?.updateUserById) {
-          await (supabaseAdmin.auth.admin as any).updateUserById(existingProfile.id, { password: tempPassword })
-          console.log('[Telegram/verify] Temporary password set for existing user')
-        }
-      } catch (err) {
-        // Non-fatal: continue — we'll still store the temporary password with the code
-        console.warn('[Telegram/verify] Failed to update existing user password via admin API', err)
-      }
 
       const { error: codeError } = await supabaseAdmin
         .from('telegram_login_codes')
-        .insert({
-          code: loginCode,
-          user_id: existingProfile.id,
-          temporary_password: tempPassword,
-        })
+        .insert({ code: loginCode, user_id: existingProfile.id })
 
       if (codeError) {
         console.error('[Telegram/verify] Failed to create login code:', codeError.message)
@@ -150,21 +127,18 @@ export async function POST(req: Request) {
       }
 
       console.log('[Telegram/verify] Login code created — action: login_existing')
-      // Return login code so frontend can exchange for session
       return NextResponse.json({ ok: true, action: 'login_existing', login_code: loginCode })
     }
 
     // New Telegram user - create account and profile
     console.log('[Telegram/verify] No existing profile found — creating new user for telegram_id:', telegramId)
     const email = generateTelegramUserEmail(telegramId)
-    const password = generateSecurePassword()
     const fullName = `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || telegramUsername || `User ${telegramId}`
 
     // Create Supabase auth user
     const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password,
-      email_confirm: true, // Auto-confirm since Telegram verified them
+      email_confirm: true,
       user_metadata: {
         full_name: fullName,
         telegram_id: telegramId,
@@ -173,13 +147,55 @@ export async function POST(req: Request) {
     })
 
     if (createError || !authData.user) {
-      console.error('[Telegram/verify] Failed to create user:', createError?.message)
-      return NextResponse.json({ error: `Failed to create user: ${createError?.message}` }, { status: 500 })
+      // Fallback: auth user may already exist (e.g. from a previous failed attempt)
+      console.warn('[Telegram/verify] createUser failed (%s) — falling back to profile/RPC lookup', createError?.message)
+
+      const { data: profileByEmail } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single()
+
+      let resolvedUserId: string | null = profileByEmail?.id || null
+
+      if (!resolvedUserId) {
+        const { data: rpcId, error: rpcError } = await supabaseAdmin
+          .rpc('get_auth_user_id_by_email', { p_email: email })
+        if (rpcError) {
+          console.warn('[Telegram/verify] RPC get_auth_user_id_by_email error:', rpcError.message)
+        }
+        resolvedUserId = (rpcId as string | null) || null
+      }
+
+      if (!resolvedUserId) {
+        console.error('[Telegram/verify] Failed to create user and no fallback found:', createError?.message)
+        return NextResponse.json({ error: `Failed to create user: ${createError?.message}` }, { status: 500 })
+      }
+
+      console.log('[Telegram/verify] Recovered existing userId=%s', resolvedUserId)
+      // Link telegram fields
+      await supabaseAdmin.from('profiles').update({
+        telegram_id: telegramId,
+        telegram_username: telegramUsername,
+        telegram_linked_at: new Date().toISOString(),
+      }).eq('id', resolvedUserId)
+
+      const loginCode = crypto.randomBytes(12).toString('hex')
+      const { error: codeError } = await supabaseAdmin
+        .from('telegram_login_codes')
+        .insert({ code: loginCode, user_id: resolvedUserId })
+
+      if (codeError) {
+        console.error('[Telegram/verify] Failed to create login code (fallback):', codeError.message)
+        return NextResponse.json({ error: `Failed to create login code: ${codeError.message}` }, { status: 500 })
+      }
+
+      return NextResponse.json({ ok: true, action: 'signup_new', user_id: resolvedUserId, login_code: loginCode })
     }
 
     console.log('[Telegram/verify] New user created:', authData.user.id)
 
-    // Profile is auto-created by the DB trigger, but update with telegram fields
+    // Profile is auto-created by the DB trigger; update with telegram fields
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({
@@ -200,11 +216,7 @@ export async function POST(req: Request) {
     const loginCode = crypto.randomBytes(12).toString('hex')
     const { error: codeError } = await supabaseAdmin
       .from('telegram_login_codes')
-      .insert({
-        code: loginCode,
-        user_id: authData.user.id,
-        temporary_password: password,
-      })
+      .insert({ code: loginCode, user_id: authData.user.id })
 
     if (codeError) {
       console.error('[Telegram/verify] Failed to create login code for new user:', codeError.message)
@@ -212,7 +224,6 @@ export async function POST(req: Request) {
     }
 
     console.log('[Telegram/verify] Login code created — action: signup_new')
-    // Return new user info with login code
     return NextResponse.json({
       ok: true,
       action: 'signup_new',

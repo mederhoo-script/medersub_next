@@ -5,7 +5,7 @@ async function setAuthCookiesFromLoginCode(req: NextRequest, loginCode: string) 
   console.log('[Telegram/callback] Looking up login code from URL parameter')
   const { data: codeData, error: codeError } = await supabaseAdmin
     .from('telegram_login_codes')
-    .select('user_id, expires_at, temporary_password')
+    .select('user_id, expires_at')
     .eq('code', loginCode)
     .single()
 
@@ -24,35 +24,21 @@ async function setAuthCookiesFromLoginCode(req: NextRequest, loginCode: string) 
     return null
   }
 
-  const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(codeData.user_id)
-  console.log('[Telegram/callback] User lookup — found:', !!user, 'error:', userError?.message ?? null)
-  if (userError || !user) {
-    console.error('[Telegram/callback] User not found for id:', codeData.user_id)
-    return null
-  }
-
-  const tempPassword = (codeData as any).temporary_password
-  const email = (user as any)?.email
-  console.log('[Telegram/callback] tempPassword present:', !!tempPassword, 'email present:', !!email)
-  if (!tempPassword || !email) {
-    console.error('[Telegram/callback] Missing tempPassword or email')
-    return null
-  }
-
-  console.log('[Telegram/callback] Attempting signInWithPassword for email:', email)
-  const signInResult = await (supabaseAdmin.auth as any).signInWithPassword({
-    email,
-    password: tempPassword,
+  console.log('[Telegram/callback] Creating session for user_id:', codeData.user_id)
+  const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
+    user_id: codeData.user_id,
   })
 
-  const session = signInResult?.data?.session
-  console.log('[Telegram/callback] signInWithPassword — session present:', !!session, 'error:', signInResult?.error?.message ?? null)
-  if (!session) {
-    console.error('[Telegram/callback] Session creation failed')
+  console.log('[Telegram/callback] createSession — session present:', !!sessionData?.session, 'error:', sessionError?.message ?? null)
+  if (sessionError || !sessionData?.session) {
+    console.error('[Telegram/callback] Session creation failed:', sessionError?.message)
     return null
   }
 
+  // Delete the used code only after session is successfully created
   await supabaseAdmin.from('telegram_login_codes').delete().eq('code', loginCode)
+
+  const session = sessionData.session
 
   console.log('[Telegram/callback] Setting auth cookies and redirecting to /dashboard')
   const response = NextResponse.redirect(new URL('/dashboard', req.url))

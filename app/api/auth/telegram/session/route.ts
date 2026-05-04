@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     // Look up the login code
     const { data: codeData, error: codeError } = await supabaseAdmin
       .from('telegram_login_codes')
-      .select('user_id, expires_at, temporary_password')
+      .select('user_id, expires_at')
       .eq('code', login_code)
       .single()
 
@@ -36,55 +36,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'code_expired' }, { status: 401 })
     }
 
-    // Get user data
-    const { data: user, error: userError } = await supabaseAdmin.auth.admin.getUserById(codeData.user_id)
-
-    console.log('[Telegram/session] User lookup for id:', codeData.user_id, '— found:', !!user, 'error:', userError?.message ?? null)
-
-    if (userError || !user) {
-      console.error('[Telegram/session] User not found for id:', codeData.user_id)
-      return NextResponse.json({ error: 'user_not_found' }, { status: 404 })
-    }
-
-    // Delete the used code
-    await supabaseAdmin.from('telegram_login_codes').delete().eq('code', login_code)
-
-    // Use the temporary password stored with the login code to sign in and obtain a session
-    const tempPassword = (codeData as any).temporary_password
-
-    if (!tempPassword) {
-      console.error('[Telegram/session] No temporary_password stored with login code')
-      return NextResponse.json({ error: 'no_temporary_password_available' }, { status: 400 })
-    }
-
-    // Sign in with email + temporary password to obtain a regular session
-    const email = (user as any)?.email
-    console.log('[Telegram/session] Attempting signInWithPassword for email:', email)
-    if (!email) {
-      console.error('[Telegram/session] User has no email address')
-      return NextResponse.json({ error: 'user_has_no_email' }, { status: 500 })
-    }
-
-    // Use signInWithPassword on the server client (service role client)
-    const signInResult = await (supabaseAdmin.auth as any).signInWithPassword({
-      email,
-      password: tempPassword,
+    // Create a session directly from the user_id — no password required
+    console.log('[Telegram/session] Creating session for user_id:', codeData.user_id)
+    const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
+      user_id: codeData.user_id,
     })
 
-    const session = signInResult?.data?.session
-    const signInError = signInResult?.error
+    console.log('[Telegram/session] createSession result — session present:', !!sessionData?.session, 'error:', sessionError?.message ?? null)
 
-    console.log('[Telegram/session] signInWithPassword result — session present:', !!session, 'error:', signInError?.message ?? null)
-
-    if (signInError || !session) {
-      console.error('[Telegram/session] Session creation failed:', signInError?.message)
+    if (sessionError || !sessionData?.session) {
+      console.error('[Telegram/session] Session creation failed:', sessionError?.message)
       return NextResponse.json({ error: 'session_creation_failed' }, { status: 500 })
     }
 
-    // Delete the used code so it cannot be reused
+    // Delete the used code only after session is successfully created
     await supabaseAdmin.from('telegram_login_codes').delete().eq('code', login_code)
 
-    console.log('[Telegram/session] Session created successfully, returning tokens')
+    const session = sessionData.session
     // Return session data so frontend can set cookies
     return NextResponse.json({
       ok: true,
