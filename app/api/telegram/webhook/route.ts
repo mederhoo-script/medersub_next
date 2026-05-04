@@ -10,6 +10,19 @@ function generateSecurePassword(): string {
   return crypto.randomBytes(16).toString('hex')
 }
 
+async function upsertTelegramProfile(
+  userId: string,
+  email: string,
+  fullName: string
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .upsert({ id: userId, email, full_name: fullName, role: 'USER', balance: 0 }, { onConflict: 'id', ignoreDuplicates: true })
+  if (error) {
+    console.warn('[TG webhook] Failed to upsert profile for userId=%s: %s', userId, error.message)
+  }
+}
+
 async function sendTelegramMessage(chatId: number, text: string) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   if (!botToken) return
@@ -164,9 +177,21 @@ export async function POST(req: NextRequest) {
             userId = profileByEmail.id
             console.log('[TG webhook] Recovered existing userId=%s via email lookup', userId)
           } else {
-            console.error('[TG webhook] Failed to create user and no existing profile found:', createError)
-            await sendTelegramMessage(chatId, '❌ Failed to create your account. Please try again later.')
-            return NextResponse.json({ ok: true })
+            // Last resort: the auth.users record may exist but the profiles row was never
+            // created (orphaned user). Look up the auth user ID directly and upsert the profile.
+            console.warn('[TG webhook] No profile by email — trying auth user lookup via RPC')
+            const { data: orphanedAuthId } = await supabaseAdmin
+              .rpc('get_auth_user_id_by_email', { p_email: email })
+
+            if (orphanedAuthId) {
+              userId = orphanedAuthId as string
+              await upsertTelegramProfile(userId, email, fullName)
+              console.log('[TG webhook] Recovered orphaned auth userId=%s, upserted profile', userId)
+            } else {
+              console.error('[TG webhook] Failed to create user and no existing profile found:', createError)
+              await sendTelegramMessage(chatId, '❌ Failed to create your account. Please try again later.')
+              return NextResponse.json({ ok: true })
+            }
           }
         } else {
           userId = authData.user.id
@@ -265,8 +290,20 @@ export async function POST(req: NextRequest) {
             userId = profileByEmail.id
             console.log('[TG webhook] login_ — recovered existing userId=%s via email lookup', userId)
           } else {
-            console.error('[TG webhook] login_ — failed to create user and no existing profile found:', createError)
-            return NextResponse.json({ ok: true })
+            // Last resort: the auth.users record may exist but the profiles row was never
+            // created (orphaned user). Look up the auth user ID directly and upsert the profile.
+            console.warn('[TG webhook] login_ — no profile by email — trying auth user lookup via RPC')
+            const { data: orphanedAuthId } = await supabaseAdmin
+              .rpc('get_auth_user_id_by_email', { p_email: email })
+
+            if (orphanedAuthId) {
+              userId = orphanedAuthId as string
+              await upsertTelegramProfile(userId, email, fullName)
+              console.log('[TG webhook] login_ — recovered orphaned auth userId=%s, upserted profile', userId)
+            } else {
+              console.error('[TG webhook] login_ — failed to create user and no existing profile found:', createError)
+              return NextResponse.json({ ok: true })
+            }
           }
         } else {
           userId = authData.user.id
