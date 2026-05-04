@@ -98,6 +98,82 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Handle plain /start command - auto-create account and send login link
+    if (text === '/start' && chatId && telegramId) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
+      const tempPassword = generateSecurePassword()
+
+      // Check if a Telegram-linked profile already exists
+      const { data: existingProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('telegram_id', telegramId)
+        .single()
+
+      let userId = existingProfile?.id || null
+
+      if (!userId) {
+        // New user: create a Supabase account
+        const email = generateTelegramUserEmail(telegramId)
+        const fullName = `${firstName} ${lastName}`.trim() || telegramUsername || `User ${telegramId}`
+
+        const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+          email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: fullName,
+            telegram_id: telegramId,
+            telegram_username: telegramUsername,
+          },
+        })
+
+        if (createError || !authData.user) {
+          await sendTelegramMessage(chatId, '❌ Failed to create your account. Please try again later.')
+          return NextResponse.json({ ok: true })
+        }
+
+        userId = authData.user.id
+
+        await supabaseAdmin
+          .from('profiles')
+          .update({
+            telegram_id: telegramId,
+            telegram_username: telegramUsername,
+            telegram_linked_at: new Date().toISOString(),
+          })
+          .eq('id', userId)
+      } else {
+        // Existing user: update the temporary password so they can sign in
+        try {
+          if ((supabaseAdmin.auth.admin as any)?.updateUserById) {
+            await (supabaseAdmin.auth.admin as any).updateUserById(userId, { password: tempPassword })
+          }
+        } catch (err) {
+          console.warn('Failed to set login password', err)
+        }
+      }
+
+      const loginCode = crypto.randomBytes(12).toString('hex')
+
+      const { error: codeError } = await supabaseAdmin
+        .from('telegram_login_codes')
+        .insert({ code: loginCode, user_id: userId, temporary_password: tempPassword })
+
+      if (!codeError) {
+        const loginUrl = `${appUrl}/api/auth/telegram/callback?code=${encodeURIComponent(loginCode)}`
+        await sendTelegramMessage(
+          chatId,
+          `👋 Welcome to Medersub!\n\n🔗 Tap the link below to log in to your account:\n${loginUrl}\n\n⏳ This link expires in 15 minutes.`
+        )
+      } else {
+        console.error('Failed to insert telegram_login_codes for /start:', codeError)
+        await sendTelegramMessage(chatId, '❌ Failed to generate login link. Please try again.')
+      }
+
+      return NextResponse.json({ ok: true })
+    }
+
     // Handle /start command with login_<code>
     if (text.startsWith('/start login_') && chatId && telegramId) {
       const code = text.replace('/start login_', '')
