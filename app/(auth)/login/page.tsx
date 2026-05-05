@@ -56,8 +56,6 @@ export default function LoginPage() {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
                 <TelegramMiniAppLogin />
-                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
-                <p className="text-sm text-gray-500">Signing you in via Telegram…</p>
             </div>
         );
     }

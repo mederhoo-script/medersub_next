@@ -180,18 +180,58 @@ export async function POST(req: NextRequest) {
           // Fallback 2: auth.users row (orphaned — no profile row yet).
           // get_auth_user_id_by_email is defined in
           // supabase/migrations/009_get_auth_user_id_by_email.sql
-          const { data: orphanedAuthId } = await supabaseAdmin
+          const { data: orphanedAuthId, error: rpcError } = await supabaseAdmin
             .rpc('get_auth_user_id_by_email', { p_email: email })
+
+          if (rpcError) {
+            console.warn('[tg-auth] RPC get_auth_user_id_by_email failed (%s) — trying admin REST fallback', rpcError.message)
+          }
 
           if (orphanedAuthId) {
             userId = orphanedAuthId as string
             console.log('[tg-auth] Recovered orphaned userId=%s via RPC', userId)
           } else {
-            console.error('[tg-auth] Failed to create or find user:', createError?.message)
-            return NextResponse.json(
-              { ok: false, error: 'account_creation_failed' },
-              { status: 500 }
-            )
+            // Fallback 3: call GoTrue admin REST API directly.  This works even when
+            // migration 009 has not been applied to the Supabase project yet, because
+            // we bypass the DB function and query auth.users via the management API.
+            // The `filter` param performs a LIKE search; we verify an exact email
+            // match below to guard against partial-match false positives.
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+            const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+            if (supabaseUrl && serviceKey) {
+              const listRes = await fetch(
+                `${supabaseUrl}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&page=1&per_page=1`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${serviceKey}`,
+                    apikey: serviceKey,
+                  },
+                }
+              ).catch((fetchErr: unknown) => {
+                console.warn('[tg-auth] admin REST fetch error:', fetchErr)
+                return null
+              })
+
+              if (listRes?.ok) {
+                const listData = (await listRes.json()) as {
+                  users?: Array<{ id: string; email?: string }>
+                }
+                // The filter is a LIKE search — verify exact match
+                const authUser = listData?.users?.find(u => u.email === email)
+                if (authUser?.id) {
+                  userId = authUser.id
+                  console.log('[tg-auth] Recovered userId=%s via admin REST API', userId)
+                }
+              }
+            }
+
+            if (!userId) {
+              console.error('[tg-auth] Failed to create or find user:', createError?.message)
+              return NextResponse.json(
+                { ok: false, error: 'account_creation_failed' },
+                { status: 500 }
+              )
+            }
           }
         }
       } else {
