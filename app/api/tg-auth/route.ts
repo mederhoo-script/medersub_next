@@ -46,8 +46,12 @@ function verifyTelegramInitData(initData: string, botToken: string): boolean {
   }
 }
 
+// Configurable via env — keeps all Telegram synthetic emails under the same domain.
+// Override TELEGRAM_EMAIL_DOMAIN if deploying under a different domain.
+const TELEGRAM_EMAIL_DOMAIN = process.env.TELEGRAM_EMAIL_DOMAIN ?? 'medersub.local'
+
 function generateTelegramUserEmail(telegramId: string): string {
-  return `telegram_${telegramId}@medersub.local`
+  return `telegram_${telegramId}@${TELEGRAM_EMAIL_DOMAIN}`
 }
 
 async function ensureProfileRow(
@@ -200,8 +204,10 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Create a Supabase session for the user (admin, no password needed).
-    // createSession is available on the admin client but is not yet in the
-    // public @supabase/supabase-js type definitions — type it explicitly.
+    // `createSession` was added to the Supabase JS admin API but is not yet
+    // reflected in the @supabase/supabase-js type definitions as of v2.x.
+    // Once the library ships official types for this method, remove the cast.
+    // Tracked upstream: https://github.com/supabase/supabase-js/issues
     console.log('[tg-auth] Creating session for userId=%s', userId)
     type AdminWithCreateSession = typeof supabaseAdmin.auth.admin & {
       createSession: (opts: { user_id: string }) => Promise<{

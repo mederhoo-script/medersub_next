@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useSyncExternalStore, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -9,20 +9,24 @@ import dynamic from 'next/dynamic';
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
 const TelegramMiniAppLogin = dynamic(() => import('@/components/auth/telegram-miniapp-login'), { ssr: false });
 
+// useSyncExternalStore snapshot functions defined outside the component so their
+// references are stable across renders (required by the hook's contract).
+function noOpSubscribe() { return () => {} }
+function getTelegramSnapshot() {
+    return !!((window as { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp?.initData);
+}
+function getServerSnapshot() { return false }
+
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    // null = not yet detected (first render), true = inside Telegram, false = normal browser
-    const [isTelegram, setIsTelegram] = useState<boolean | null>(null);
+    // useSyncExternalStore: returns false on the server, then re-checks on the
+    // client after hydration — safe, no setState-in-effect, no hydration mismatch.
+    const isTelegram = useSyncExternalStore(noOpSubscribe, getTelegramSnapshot, getServerSnapshot);
     const router = useRouter();
-
-    useEffect(() => {
-        const tg = (window as { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp;
-        setIsTelegram(!!tg?.initData);
-    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -58,17 +62,7 @@ export default function LoginPage() {
         );
     }
 
-    // isTelegram === null means we haven't detected yet (first paint before useEffect).
-    // Show a neutral loading state so there is no flash of the form inside Telegram.
-    if (isTelegram === null) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
-            </div>
-        );
-    }
-
-    // Normal browser — show the standard login form unchanged.
+    // Normal browser — show the standard login form.
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
             <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
@@ -143,7 +137,7 @@ export default function LoginPage() {
                 </form>
                 <div className="text-center text-sm">
                     <p className="text-gray-600">
-                        Don't have an account?{' '}
+                        Don&apos;t have an account?{' '}
                         <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
                             Sign up
                         </Link>
