@@ -17,24 +17,26 @@
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, role, balance)
-  VALUES (
-    new.id,
-    new.email,
-    new.raw_user_meta_data->>'full_name',
-    'USER',
-    0
-  )
-  ON CONFLICT (id) DO NOTHING;
+  -- Inner block so the EXCEPTION handler only covers the INSERT, not RETURN.
+  BEGIN
+    INSERT INTO public.profiles (id, email, full_name, role, balance)
+    VALUES (
+      new.id,
+      new.email,
+      new.raw_user_meta_data->>'full_name',
+      'USER',
+      0
+    )
+    ON CONFLICT (id) DO NOTHING;
+  EXCEPTION
+    WHEN OTHERS THEN
+      -- Log the problem but never let a profile-insert error abort the
+      -- auth user creation.  The calling code (tg-auth / webhook) will
+      -- upsert the profile row itself after createUser returns.
+      RAISE WARNING 'handle_new_user: could not insert profile for id=%, email=% — %: %',
+        new.id, new.email, SQLSTATE, SQLERRM;
+  END;
 
   RETURN new;
-EXCEPTION
-  WHEN OTHERS THEN
-    -- Log the problem but never let a profile-insert error abort the
-    -- auth user creation.  The calling code (tg-auth / webhook) will
-    -- upsert the profile row itself after createUser returns.
-    RAISE WARNING 'handle_new_user: could not insert profile for id=%, email=% — %: %',
-      new.id, new.email, SQLSTATE, SQLERRM;
-    RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
