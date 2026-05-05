@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Users, FileText, Settings, LogOut, Wallet } from 'lucide-react';
+import { Home, Users, FileText, Settings, LogOut, Wallet, Send } from 'lucide-react';
 import clsx from 'clsx';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 const navItems = [
     { icon: Home, label: 'Overview', href: '/admin' },
     { icon: Users, label: 'Users', href: '/admin/users' },
+    { icon: Send, label: 'Telegram', href: '/admin/telegram-users' },
     { icon: FileText, label: 'Transactions', href: '/admin/transactions' },
     { icon: Settings, label: 'Settings', href: '/admin/settings' },
 ];

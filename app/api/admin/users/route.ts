@@ -61,3 +61,20 @@ export async function PUT(req: Request) {
         return NextResponse.json({ error: err.message }, { status: 500 });
     }
 }
+
+export async function DELETE(req: Request) {
+    try {
+        const { id } = await req.json();
+
+        if (!id) return NextResponse.json({ error: 'User ID required' }, { status: 400 });
+
+        // Delete from Supabase Auth (profiles/wallets cascade via DB foreign keys)
+        const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+        return NextResponse.json({ success: true });
+    } catch (err: any) {
+        return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+}
