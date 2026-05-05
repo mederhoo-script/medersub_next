@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { Loader2, AlertCircle } from 'lucide-react'
 
 /**
  * Detects whether the app is running inside the Telegram Mini App (WebApp) environment.
@@ -10,9 +11,13 @@ import { supabase } from '@/lib/supabase'
  *
  * The telegram-web-app.js script is loaded in app/layout.tsx so
  * window.Telegram.WebApp is available before this component mounts.
+ *
+ * Renders its own loading spinner and, on failure, an error message with a
+ * retry button — so the caller never shows a stuck spinner.
  */
 export default function TelegramMiniAppLogin() {
   const attempted = useRef(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (attempted.current) return
@@ -32,22 +37,24 @@ export default function TelegramMiniAppLogin() {
       body: JSON.stringify({ init_data: tg.initData }),
     })
       .then(res => res.json())
-      .then(async json => {
+      .then(async (json: { ok: boolean; access_token?: string; refresh_token?: string; error?: string }) => {
         if (!json.ok || !json.access_token) {
           console.error('[MiniApp] Auto-login failed:', json.error)
+          setError('Sign-in failed. Please tap Retry or reopen the app.')
           return
         }
 
         console.log('[MiniApp] Session received — setting session via Supabase client')
 
         // Set the session client-side so Supabase SSR cookies are written correctly
-        const { error } = await supabase.auth.setSession({
+        const { error: sessionErr } = await supabase.auth.setSession({
           access_token: json.access_token,
-          refresh_token: json.refresh_token,
+          refresh_token: json.refresh_token!,
         })
 
-        if (error) {
-          console.error('[MiniApp] setSession failed:', error.message)
+        if (sessionErr) {
+          console.error('[MiniApp] setSession failed:', sessionErr.message)
+          setError('Session error. Please tap Retry or reopen the app.')
           return
         }
 
@@ -56,9 +63,29 @@ export default function TelegramMiniAppLogin() {
       })
       .catch(err => {
         console.error('[MiniApp] Network error during auto-login:', err)
+        setError('Network error. Please check your connection and tap Retry.')
       })
   }, [])
 
-  // Renders nothing — this is a behaviour-only component
-  return null
+  if (error) {
+    return (
+      <>
+        <AlertCircle className="h-10 w-10 text-red-500" />
+        <p className="text-sm text-red-500 text-center px-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-1 text-sm font-medium text-blue-600 underline underline-offset-2"
+        >
+          Retry
+        </button>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+      <p className="text-sm text-gray-500">Signing you in via Telegram…</p>
+    </>
+  )
 }
