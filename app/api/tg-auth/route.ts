@@ -262,9 +262,16 @@ export async function POST(req: NextRequest) {
 
     // Use a throw-away, non-persistent client to exchange the token for a
     // real session without touching the shared admin client's state.
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !anonKey) {
+      console.error('[tg-auth] Supabase URL or anon key env vars not configured')
+      return NextResponse.json({ ok: false, error: 'server_misconfigured' }, { status: 500 })
+    }
+
     const { data: sessionData, error: sessionError } = await createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseUrl,
+      anonKey,
       { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
     ).auth.verifyOtp({
       token_hash: linkData.properties.hashed_token,
