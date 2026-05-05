@@ -199,44 +199,51 @@ Props:
 - `botUsername?: string` - Bot username (optional, falls back to env var)
 - `label?: string` - Button label (default: "Continue with Telegram")
 
-## Future Enhancements
+## Mini App Login (Auto-login inside Telegram)
 
-### 1. Telegram-First Signup
-Allow users without an existing account to sign up using Telegram:
-- Verify Telegram identity
-- Create Supabase user with admin client
-- Link telegram_id
-- Optionally prompt for email/password later
+When a user opens the app as a **Telegram Mini App** (via a bot or direct link), it automatically authenticates them without showing the login form.
 
-### 2. Deep-Linking with Bot
-Use Telegram Bot to receive `/start link_<code>` messages:
-- Generate one-time code on frontend
-- User clicks bot link
-- Bot forwards code to backend webhook
-- Backend creates session without needing widget
-
-### 3. Telegram Login (Telegram-First Users)
-Allow users to login with just their Telegram ID:
-```tsx
-// In login page
-const { data } = await supabase
-  .from('profiles')
-  .select('*')
-  .eq('telegram_id', telegramId)
-  .single()
-
-if (data) {
-  // Create session and redirect to dashboard
-}
+### How it works
+```
+User opens app inside Telegram Mini App
+    ↓
+Login page detects window.Telegram.WebApp.initData (useSyncExternalStore)
+    ↓
+Shows loading spinner — no email/password form shown
+    ↓
+TelegramMiniAppLogin component POSTs initData to POST /api/tg-auth
+    ↓
+Server verifies HMAC signature (TELEGRAM_BOT_TOKEN)
+    ↓
+Checks auth_date freshness (max 24 h)
+    ↓
+Looks up profiles by telegram_id
+    ↓
+  Found → existing user → create session
+  Not found → createUser() → upsert profile row → create session
+    ↓
+Returns { ok: true, access_token, refresh_token }
+    ↓
+Client calls supabase.auth.setSession() → redirect to /dashboard
 ```
 
-### 4. Admin Dashboard
-Track Telegram-linked accounts:
-```tsx
-const { data } = await supabase
-  .from('profiles')
-  .select('*')
-  .not('telegram_id', 'is', null)
+### File structure (Mini App additions)
+```
+app/
+  (auth)/
+    login/page.tsx              # Detects Telegram context, renders MiniApp path or normal form
+  api/tg-auth/route.ts          # Verifies initData, find/create user, return session tokens
+components/auth/
+  telegram-miniapp-login.tsx    # Behaviour-only component — POSTs initData, sets session
+supabase/migrations/
+  009_get_auth_user_id_by_email.sql  # RPC for orphaned-auth-record recovery
+  010_telegram_id_unique.sql         # UNIQUE constraint on profiles.telegram_id
+```
+
+### Environment variables
+```env
+TELEGRAM_BOT_TOKEN=your-bot-token        # required
+TELEGRAM_EMAIL_DOMAIN=medersub.local     # optional — domain for synthetic Telegram emails
 ```
 
 ## Troubleshooting
