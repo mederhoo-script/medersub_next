@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import crypto from 'crypto'
 
@@ -69,7 +70,6 @@ async function ensureProfileRow(
         email,
         full_name: fullName,
         role: 'USER',
-        balance: 0,
         telegram_id: telegramId,
         telegram_username: telegramUsername,
         telegram_linked_at: new Date().toISOString(),
@@ -243,21 +243,40 @@ export async function POST(req: NextRequest) {
       await ensureProfileRow(userId, email, fullName, telegramId, telegramUsername)
     }
 
-    // 6. Create a Supabase session for the user (admin, no password needed).
-    // `createSession` was added to the Supabase JS admin API but is not yet
-    // reflected in the @supabase/supabase-js type definitions as of v2.x.
-    // Once the library ships official types for this method, remove the cast.
-    // Tracked upstream: https://github.com/supabase/supabase-js/issues
+    // 6. Create a Supabase session for the user via magic-link token exchange.
+    // auth.admin.createSession does not exist in @supabase/supabase-js v2.x.
+    // Instead we generate a one-time magic-link token with the admin API and
+    // immediately exchange it for a session using a stateless client (so the
+    // shared supabaseAdmin singleton is not affected).
     console.log('[tg-auth] Creating session for userId=%s', userId)
-    type AdminWithCreateSession = typeof supabaseAdmin.auth.admin & {
-      createSession: (opts: { user_id: string }) => Promise<{
-        data: { session: { access_token: string; refresh_token: string; expires_in: number } | null }
-        error: { message: string } | null
-      }>
+
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+    })
+
+    if (linkError || !linkData?.properties?.hashed_token) {
+      console.error('[tg-auth] generateLink failed:', linkError?.message)
+      return NextResponse.json({ ok: false, error: 'session_creation_failed' }, { status: 500 })
     }
-    const { data: sessionData, error: sessionError } = await (
-      supabaseAdmin.auth.admin as AdminWithCreateSession
-    ).createSession({ user_id: userId })
+
+    // Use a throw-away, non-persistent client to exchange the token for a
+    // real session without touching the shared admin client's state.
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !anonKey) {
+      console.error('[tg-auth] Supabase URL or anon key env vars not configured')
+      return NextResponse.json({ ok: false, error: 'server_misconfigured' }, { status: 500 })
+    }
+
+    const { data: sessionData, error: sessionError } = await createClient(
+      supabaseUrl,
+      anonKey,
+      { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+    ).auth.verifyOtp({
+      token_hash: linkData.properties.hashed_token,
+      type: 'magiclink',
+    })
 
     if (sessionError || !sessionData?.session) {
       console.error('[tg-auth] Session creation failed:', sessionError?.message)
