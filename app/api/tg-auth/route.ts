@@ -194,6 +194,8 @@ export async function POST(req: NextRequest) {
             // Fallback 3: call GoTrue admin REST API directly.  This works even when
             // migration 009 has not been applied to the Supabase project yet, because
             // we bypass the DB function and query auth.users via the management API.
+            // The `filter` param performs a LIKE search; we verify an exact email
+            // match below to guard against partial-match false positives.
             const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
             const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
             if (supabaseUrl && serviceKey) {
