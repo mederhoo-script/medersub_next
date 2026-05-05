@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useSyncExternalStore, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -9,15 +9,24 @@ import dynamic from 'next/dynamic';
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
 const TelegramMiniAppLogin = dynamic(() => import('@/components/auth/telegram-miniapp-login'), { ssr: false });
 
+// useSyncExternalStore snapshot functions defined outside the component so their
+// references are stable across renders (required by the hook's contract).
+function noOpSubscribe() { return () => {} }
+function getTelegramSnapshot() {
+    return !!((window as { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp?.initData);
+}
+function getServerSnapshot() { return false }
+
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // useSyncExternalStore: returns false on the server, then re-checks on the
+    // client after hydration — safe, no setState-in-effect, no hydration mismatch.
+    const isTelegram = useSyncExternalStore(noOpSubscribe, getTelegramSnapshot, getServerSnapshot);
     const router = useRouter();
-
-
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -41,10 +50,21 @@ export default function LoginPage() {
         }
     };
 
+    // Inside Telegram Mini App: show a loading screen and let TelegramMiniAppLogin
+    // silently authenticate and redirect to /dashboard. Never show the email/password form.
+    if (isTelegram) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
+                <TelegramMiniAppLogin />
+                <Loader2 className="h-10 w-10 animate-spin text-blue-600" />
+                <p className="text-sm text-gray-500">Signing you in via Telegram…</p>
+            </div>
+        );
+    }
+
+    // Normal browser — show the standard login form.
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
-            {/* Auto-login when opened from Telegram Mini App */}
-            <TelegramMiniAppLogin />
             <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                 <div className="text-center">
                     <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Welcome Back</h2>
@@ -117,7 +137,7 @@ export default function LoginPage() {
                 </form>
                 <div className="text-center text-sm">
                     <p className="text-gray-600">
-                        Don't have an account?{' '}
+                        Don&apos;t have an account?{' '}
                         <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
                             Sign up
                         </Link>
