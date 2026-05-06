@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Loader2, Search, MoreVertical, Plus, Edit, FileText, X } from 'lucide-react';
+import { Loader2, Search, MoreVertical, Plus, Edit, FileText, X, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminUsersPage() {
@@ -51,6 +51,25 @@ export default function AdminUsersPage() {
             alert('Error updating user');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleDeleteUser = async (user: any) => {
+        if (!confirm(`Are you sure you want to permanently delete user "${user.full_name || user.email}"? This action cannot be undone.`)) return;
+        try {
+            const res = await fetch('/api/admin/users', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: user.id })
+            });
+            if (res.ok) {
+                fetchUsers();
+            } else {
+                const data = await res.json();
+                alert('Failed to delete user: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Error deleting user');
         }
     };
 
@@ -166,6 +185,12 @@ export default function AdminUsersPage() {
                                             className={`text-xs px-2 py-1 rounded border ${user.is_blocked ? 'text-green-600 border-green-200 bg-green-50' : 'text-red-600 border-red-200 bg-red-50'}`}
                                         >
                                             {user.is_blocked ? 'Unblock' : 'Block'}
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteUser(user)}
+                                            className="text-red-600 hover:text-red-900 p-1 bg-red-50 rounded" title="Delete User"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
                                         </button>
                                     </td>
                                 </tr>

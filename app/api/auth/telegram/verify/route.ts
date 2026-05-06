@@ -25,6 +25,15 @@ function generateTelegramUserEmail(telegramId: string): string {
   return `telegram_${telegramId}@medersub.local`
 }
 
+async function ensureWalletRow(userId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('wallets')
+    .upsert({ user_id: userId, balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true })
+  if (error) {
+    console.warn('[Telegram/verify] Failed to ensure wallet for userId=%s: %s', userId, error.message)
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
@@ -126,6 +135,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Failed to create login code: ${codeError.message}` }, { status: 500 })
       }
 
+      // Ensure wallet exists (backfills any existing users who never had one)
+      await ensureWalletRow(existingProfile.id)
+
       console.log('[Telegram/verify] Login code created — action: login_existing')
       return NextResponse.json({ ok: true, action: 'login_existing', login_code: loginCode })
     }
@@ -173,12 +185,19 @@ export async function POST(req: Request) {
       }
 
       console.log('[Telegram/verify] Recovered existing userId=%s', resolvedUserId)
-      // Link telegram fields
-      await supabaseAdmin.from('profiles').update({
+      // Upsert profile with telegram fields (handles both existing rows and missing rows)
+      await supabaseAdmin.from('profiles').upsert({
+        id: resolvedUserId,
+        email,
+        full_name: fullName,
+        role: 'USER',
         telegram_id: telegramId,
         telegram_username: telegramUsername,
         telegram_linked_at: new Date().toISOString(),
-      }).eq('id', resolvedUserId)
+      }, { onConflict: 'id' })
+
+      // Ensure wallet row exists
+      await ensureWalletRow(resolvedUserId)
 
       const loginCode = crypto.randomBytes(12).toString('hex')
       const { error: codeError } = await supabaseAdmin
@@ -195,22 +214,29 @@ export async function POST(req: Request) {
 
     console.log('[Telegram/verify] New user created:', authData.user.id)
 
-    // Profile is auto-created by the DB trigger; update with telegram fields
+    // Upsert profile with telegram fields — works whether or not the DB trigger already
+    // created the row (the trigger is exception-safe and may silently no-op).
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({
+      .upsert({
+        id: authData.user.id,
+        email,
+        full_name: fullName,
+        role: 'USER',
         telegram_id: telegramId,
         telegram_username: telegramUsername,
         telegram_linked_at: new Date().toISOString(),
-      })
-      .eq('id', authData.user.id)
+      }, { onConflict: 'id' })
       .select()
       .single()
 
     if (profileError) {
-      console.error('[Telegram/verify] Failed to update profile with telegram fields:', profileError.message)
+      console.error('[Telegram/verify] Failed to upsert profile with telegram fields:', profileError.message)
       return NextResponse.json({ error: profileError.message }, { status: 500 })
     }
+
+    // Ensure wallet row exists for the new user
+    await ensureWalletRow(authData.user.id)
 
     // Generate a one-time login code
     const loginCode = crypto.randomBytes(12).toString('hex')

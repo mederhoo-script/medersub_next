@@ -46,6 +46,23 @@ export async function updateSession(request: NextRequest) {
         }
     }
 
+    // Admin API protected routes - return JSON errors instead of redirects
+    if (request.nextUrl.pathname.startsWith('/api/admin')) {
+        if (!user) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const { data: apiProfile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (apiProfile?.role?.toLowerCase() !== 'admin') {
+            return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+        }
+    }
+
     // Admin protected routes
     if (request.nextUrl.pathname.startsWith('/admin')) {
         if (!user) {
@@ -61,7 +78,7 @@ export async function updateSession(request: NextRequest) {
             .eq('id', user.id)
             .single()
 
-        if (profile?.role !== 'admin') {
+        if (profile?.role?.toLowerCase() !== 'admin') {
             const url = request.nextUrl.clone()
             url.pathname = '/dashboard'
             return NextResponse.redirect(url)

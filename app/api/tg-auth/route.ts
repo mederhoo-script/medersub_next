@@ -82,6 +82,16 @@ async function ensureProfileRow(
   }
 }
 
+async function ensureWalletRow(userId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('wallets')
+    .upsert({ user_id: userId, balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true })
+
+  if (error) {
+    console.warn('[tg-auth] Failed to ensure wallet for userId=%s: %s', userId, error.message)
+  }
+}
+
 export async function POST(req: NextRequest) {
   console.log('[tg-auth] POST /api/tg-auth called')
 
@@ -242,6 +252,9 @@ export async function POST(req: NextRequest) {
       // Ensure profile row has telegram fields populated
       await ensureProfileRow(userId, email, fullName, telegramId, telegramUsername)
     }
+
+    // Ensure a wallet row exists (idempotent — safe for both new and returning users)
+    await ensureWalletRow(userId!)
 
     // 6. Create a Supabase session for the user via magic-link token exchange.
     // auth.admin.createSession does not exist in @supabase/supabase-js v2.x.
