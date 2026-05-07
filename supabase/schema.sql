@@ -68,7 +68,7 @@ begin
     on conflict (id) do nothing;
   exception
     when others then
-      raise warning 'handle_new_user: could not insert profile for id=%, email=% — %: %',
+      raise warning 'handle_new_user: could not insert profile for id=%, email=% - %: %',
         new.id, new.email, SQLSTATE, SQLERRM;
   end;
   return new;
@@ -89,7 +89,7 @@ begin
     on conflict (user_id) do nothing;
   exception
     when others then
-      raise warning 'handle_new_profile: could not insert wallet for id=% — %: %',
+      raise warning 'handle_new_profile: could not insert wallet for id=% - %: %',
         new.id, SQLSTATE, SQLERRM;
   end;
 

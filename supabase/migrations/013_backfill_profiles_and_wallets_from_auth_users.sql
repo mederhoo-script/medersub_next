@@ -10,7 +10,7 @@ BEGIN
     ON CONFLICT (user_id) DO NOTHING;
   EXCEPTION
     WHEN OTHERS THEN
-      RAISE WARNING 'handle_new_profile: could not insert wallet for id=% — %: %',
+      RAISE WARNING 'handle_new_profile: could not insert wallet for id=% - %: %',
         new.id, SQLSTATE, SQLERRM;
   END;
 
