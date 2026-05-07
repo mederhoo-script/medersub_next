@@ -63,8 +63,28 @@ create or replace function public.handle_new_user()
 returns trigger as $$
 begin
   begin
-    insert into public.profiles (id, email, full_name, role)
-    values (new.id, new.email, new.raw_user_meta_data->>'full_name', 'USER')
+    insert into public.profiles (
+      id,
+      email,
+      full_name,
+      role,
+      telegram_id,
+      telegram_username,
+      telegram_linked_at
+    )
+    values (
+      new.id,
+      new.email,
+      new.raw_user_meta_data->>'full_name',
+      'USER',
+      nullif(new.raw_user_meta_data->>'telegram_id', ''),
+      nullif(new.raw_user_meta_data->>'telegram_username', ''),
+      case
+        when nullif(new.raw_user_meta_data->>'telegram_id', '') is not null
+          then coalesce(new.created_at, timezone('utc'::text, now()))
+        else null
+      end
+    )
     on conflict (id) do nothing;
   exception
     when others then

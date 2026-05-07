@@ -56,7 +56,7 @@ SELECT
   NULLIF(au.raw_user_meta_data->>'telegram_username', ''),
   CASE
     WHEN NULLIF(au.raw_user_meta_data->>'telegram_id', '') IS NOT NULL
-      THEN COALESCE(au.updated_at, au.created_at, timezone('utc'::text, now()))
+      THEN COALESCE(au.created_at, timezone('utc'::text, now()))
     ELSE NULL
   END
 FROM auth.users au
