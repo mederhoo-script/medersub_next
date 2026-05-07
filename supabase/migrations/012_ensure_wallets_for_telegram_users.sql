@@ -7,5 +7,4 @@
 INSERT INTO wallets (user_id, balance)
 SELECT id, 0
 FROM profiles p
-WHERE NOT EXISTS (SELECT 1 FROM wallets w WHERE w.user_id = p.id)
-ON CONFLICT (user_id) DO NOTHING;
+WHERE NOT EXISTS (SELECT 1 FROM wallets w WHERE w.user_id = p.id);
