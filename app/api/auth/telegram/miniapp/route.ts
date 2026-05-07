@@ -37,11 +37,23 @@ function generateTelegramUserEmail(telegramId: string): string {
 async function upsertTelegramProfile(
   userId: string,
   email: string,
-  fullName: string
+  fullName: string,
+  telegramId: string,
+  telegramUsername: string | null
 ): Promise<void> {
   const { error } = await supabaseAdmin
     .from('profiles')
-    .upsert({ id: userId, email, full_name: fullName, role: 'USER', balance: 0 }, { onConflict: 'id', ignoreDuplicates: true })
+    .upsert(
+      {
+        id: userId,
+        email,
+        full_name: fullName,
+        telegram_id: telegramId,
+        telegram_username: telegramUsername,
+        telegram_linked_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    )
   if (error) {
     console.warn('[Telegram/miniapp] Failed to upsert profile for userId=%s: %s', userId, error.message)
   }
@@ -159,7 +171,7 @@ export async function POST(req: NextRequest) {
 
           if (orphanedAuthId) {
             userId = orphanedAuthId as string
-            await upsertTelegramProfile(userId, email, fullName)
+            await upsertTelegramProfile(userId, email, fullName, telegramId, telegramUsername)
             console.log('[Telegram/miniapp] Recovered orphaned auth userId=%s', userId)
           } else {
             console.error('[Telegram/miniapp] Failed to create or find user:', createError?.message)
@@ -171,15 +183,7 @@ export async function POST(req: NextRequest) {
         console.log('[Telegram/miniapp] New user created userId=%s', userId)
       }
 
-      // Link Telegram fields to profile
-      await supabaseAdmin
-        .from('profiles')
-        .update({
-          telegram_id: telegramId,
-          telegram_username: telegramUsername,
-          telegram_linked_at: new Date().toISOString(),
-        })
-        .eq('id', userId)
+      await upsertTelegramProfile(userId, email, fullName, telegramId, telegramUsername)
     }
 
     await ensureWalletRow(userId)

@@ -10,13 +10,34 @@ function generateTelegramUserEmail(telegramId: string): string {
 async function upsertTelegramProfile(
   userId: string,
   email: string,
-  fullName: string
+  fullName: string,
+  telegramId: string,
+  telegramUsername: string | null
 ): Promise<void> {
   const { error } = await supabaseAdmin
     .from('profiles')
-    .upsert({ id: userId, email, full_name: fullName, role: 'USER', balance: 0 }, { onConflict: 'id', ignoreDuplicates: true })
+    .upsert(
+      {
+        id: userId,
+        email,
+        full_name: fullName,
+        telegram_id: telegramId,
+        telegram_username: telegramUsername,
+        telegram_linked_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    )
   if (error) {
     console.warn('[TG webhook] Failed to upsert profile for userId=%s: %s', userId, error.message)
+  }
+}
+
+async function ensureWalletRow(userId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('wallets')
+    .upsert({ user_id: userId, balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true })
+  if (error) {
+    console.warn('[TG webhook] Failed to ensure wallet for userId=%s: %s', userId, error.message)
   }
 }
 
@@ -190,7 +211,7 @@ export async function POST(req: NextRequest) {
 
             if (orphanedAuthId) {
               userId = orphanedAuthId as string
-              await upsertTelegramProfile(userId, email, fullName)
+              await upsertTelegramProfile(userId, email, fullName, telegramId, telegramUsername)
               console.log('[TG webhook] Recovered orphaned auth userId=%s, upserted profile', userId)
             } else {
               console.error('[TG webhook] Failed to create user and no existing profile found:', createError)
@@ -203,15 +224,10 @@ export async function POST(req: NextRequest) {
           console.log('[TG webhook] New user created — userId=%s', userId)
         }
 
-        await supabaseAdmin
-          .from('profiles')
-          .update({
-            telegram_id: telegramId,
-            telegram_username: telegramUsername,
-            telegram_linked_at: new Date().toISOString(),
-          })
-          .eq('id', userId)
+        await upsertTelegramProfile(userId, email, fullName, telegramId, telegramUsername)
       }
+
+      await ensureWalletRow(userId)
 
       const loginCode = crypto.randomBytes(12).toString('hex')
 
@@ -290,7 +306,7 @@ export async function POST(req: NextRequest) {
 
             if (orphanedAuthId) {
               userId = orphanedAuthId as string
-              await upsertTelegramProfile(userId, email, fullName)
+              await upsertTelegramProfile(userId, email, fullName, telegramId, telegramUsername)
               console.log('[TG webhook] login_ — recovered orphaned auth userId=%s, upserted profile', userId)
             } else {
               console.error('[TG webhook] login_ — failed to create user and no existing profile found:', createError)
@@ -303,15 +319,10 @@ export async function POST(req: NextRequest) {
           console.log('[TG webhook] login_ — new user created userId=%s', userId)
         }
 
-        await supabaseAdmin
-          .from('profiles')
-          .update({
-            telegram_id: telegramId,
-            telegram_username: telegramUsername,
-            telegram_linked_at: new Date().toISOString(),
-          })
-          .eq('id', userId)
+        await upsertTelegramProfile(userId, email, fullName, telegramId, telegramUsername)
       }
+
+      await ensureWalletRow(userId)
 
       const loginCode = crypto.randomBytes(12).toString('hex')
 
