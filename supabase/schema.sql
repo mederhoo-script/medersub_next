@@ -63,8 +63,8 @@ create or replace function public.handle_new_user()
 returns trigger as $$
 begin
   begin
-    insert into public.profiles (id, email, full_name, role, balance)
-    values (new.id, new.email, new.raw_user_meta_data->>'full_name', 'USER', 0)
+    insert into public.profiles (id, email, full_name, role)
+    values (new.id, new.email, new.raw_user_meta_data->>'full_name', 'USER')
     on conflict (id) do nothing;
   exception
     when others then
@@ -84,8 +84,8 @@ create or replace function public.handle_new_profile()
 returns trigger as $$
 begin
   begin
-    insert into public.wallets (user_id, balance)
-    values (new.id, 0)
+    insert into public.wallets (user_id)
+    values (new.id)
     on conflict (user_id) do nothing;
   exception
     when others then

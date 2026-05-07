@@ -5,8 +5,8 @@ CREATE OR REPLACE FUNCTION public.handle_new_profile()
 RETURNS trigger AS $$
 BEGIN
   BEGIN
-    INSERT INTO public.wallets (user_id, balance)
-    VALUES (new.id, 0)
+    INSERT INTO public.wallets (user_id)
+    VALUES (new.id)
     ON CONFLICT (user_id) DO NOTHING;
   EXCEPTION
     WHEN OTHERS THEN
@@ -29,7 +29,6 @@ INSERT INTO public.profiles (
   email,
   full_name,
   role,
-  balance,
   telegram_id,
   telegram_username,
   telegram_linked_at
@@ -53,11 +52,10 @@ SELECT
     au.email
   ),
   COALESCE(NULLIF(au.raw_user_meta_data->>'role', ''), 'USER'),
-  0,
   NULLIF(au.raw_user_meta_data->>'telegram_id', ''),
   NULLIF(au.raw_user_meta_data->>'telegram_username', ''),
   CASE
-    WHEN COALESCE(NULLIF(au.raw_user_meta_data->>'telegram_id', ''), '') <> ''
+    WHEN NULLIF(au.raw_user_meta_data->>'telegram_id', '') IS NOT NULL
       THEN COALESCE(au.updated_at, au.created_at, timezone('utc'::text, now()))
     ELSE NULL
   END
@@ -67,8 +65,8 @@ LEFT JOIN public.profiles p
 WHERE p.id IS NULL
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO public.wallets (user_id, balance)
-SELECT p.id, 0
+INSERT INTO public.wallets (user_id)
+SELECT p.id
 FROM public.profiles p
 LEFT JOIN public.wallets w
   ON w.user_id = p.id
