@@ -21,8 +21,6 @@ async function upsertTelegramProfile(
         id: userId,
         email,
         full_name: fullName,
-        role: 'USER',
-        balance: 0,
         telegram_id: telegramId,
         telegram_username: telegramUsername,
         telegram_linked_at: new Date().toISOString(),
