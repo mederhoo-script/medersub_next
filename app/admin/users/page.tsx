@@ -73,9 +73,12 @@ export default function AdminUsersPage() {
         }
     };
 
+    const normalizedSearch = searchTerm.toLowerCase();
     const filteredUsers = users.filter(u =>
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        u.email?.toLowerCase().includes(normalizedSearch) ||
+        u.full_name?.toLowerCase().includes(normalizedSearch) ||
+        String(u.telegram_id || '').toLowerCase().includes(normalizedSearch) ||
+        String(u.telegram_username || '').toLowerCase().includes(normalizedSearch)
     );
 
     return (
