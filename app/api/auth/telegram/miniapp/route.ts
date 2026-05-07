@@ -47,6 +47,15 @@ async function upsertTelegramProfile(
   }
 }
 
+async function ensureWalletRow(userId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('wallets')
+    .upsert({ user_id: userId, balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true })
+  if (error) {
+    console.warn('[Telegram/miniapp] Failed to ensure wallet for userId=%s: %s', userId, error.message)
+  }
+}
+
 export async function POST(req: NextRequest) {
   console.log('[Telegram/miniapp] POST /api/auth/telegram/miniapp called')
 
@@ -172,6 +181,8 @@ export async function POST(req: NextRequest) {
         })
         .eq('id', userId)
     }
+
+    await ensureWalletRow(userId)
 
     // Create admin session — no password needed
     console.log('[Telegram/miniapp] Creating session for userId=%s', userId)

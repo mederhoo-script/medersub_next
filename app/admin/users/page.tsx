@@ -75,7 +75,9 @@ export default function AdminUsersPage() {
 
     const filteredUsers = users.filter(u =>
         u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.telegram_id?.includes(searchTerm) ||
+        u.telegram_username?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
