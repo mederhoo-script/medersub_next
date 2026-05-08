@@ -1,6 +1,9 @@
 -- Backfill missing profiles and wallets for auth.users rows, including
 -- Telegram-created accounts that were left without related public records.
 
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS email text;
+
 CREATE OR REPLACE FUNCTION public.handle_new_profile()
 RETURNS trigger AS $$
 BEGIN

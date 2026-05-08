@@ -75,21 +75,7 @@ begin
     values (
       new.id,
       new.email,
-      coalesce(
-        nullif(btrim(new.raw_user_meta_data->>'full_name'), ''),
-        nullif(
-          btrim(
-            concat_ws(
-              ' ',
-              new.raw_user_meta_data->>'first_name',
-              new.raw_user_meta_data->>'last_name'
-            )
-          ),
-          ''
-        ),
-        nullif(btrim(new.raw_user_meta_data->>'name'), ''),
-        new.email
-      ),
+      new.raw_user_meta_data->>'full_name',
       'USER',
       nullif(new.raw_user_meta_data->>'telegram_id', ''),
       nullif(new.raw_user_meta_data->>'telegram_username', ''),
