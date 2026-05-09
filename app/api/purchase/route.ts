@@ -137,7 +137,7 @@ export async function POST(req: Request) {
 
         // 3. Deduct Total Charge from selected balance
         const newBalance = currentBalance - totalCharge;
-        let updateError: any = null;
+        let updateError: { message?: string } | null = null;
         if (selectedPaymentSource === 'reward') {
             const rewardUpdate = await supabaseAdmin
                 .from('profiles')

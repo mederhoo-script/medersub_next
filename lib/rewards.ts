@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 const TELEGRAM_EMAIL_DOMAIN = process.env.TELEGRAM_EMAIL_DOMAIN ?? 'medersub.local'
+const REFERRAL_BONUS_NGN = Number(process.env.REWARD_REFERRAL_BONUS_NGN ?? 5) || 5
 
 function verifyTelegramInitData(initData: string, botToken: string): boolean {
   const params = new URLSearchParams(initData)
@@ -199,7 +200,7 @@ export async function applyReferralIfEligible(user: RewardResolvedUser, referred
 
   if (!referrer?.id) return
 
-  const referralBonus = 5
+  const referralBonus = REFERRAL_BONUS_NGN
   await supabaseAdmin
     .from('profiles')
     .update({

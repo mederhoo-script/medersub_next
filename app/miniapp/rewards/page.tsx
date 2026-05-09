@@ -21,12 +21,17 @@ function getOrCreateBrowserUid(): string {
   const existing = window.localStorage.getItem(key)
   if (existing && /^USR\d{5,}$/.test(existing)) return existing
 
-  const generated = `USR${Math.floor(10000 + Math.random() * 90000)}`
+  const random = globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % 90000
+  const generated = `USR${String(10000 + random).padStart(5, '0')}`
   window.localStorage.setItem(key, generated)
   return generated
 }
 
 async function triggerMonetagRewardedInterstitial(): Promise<void> {
+  if (MONETAG_ZONE_ID === 'MONETAG_ZONE_ID_HERE') {
+    console.warn('NEXT_PUBLIC_MONETAG_ZONE_ID is not set; using MONETAG_ZONE_ID_HERE placeholder.')
+  }
+
   if (!document.querySelector(`script[data-monetag-zone="${MONETAG_ZONE_ID}"]`)) {
     const script = document.createElement('script')
     script.async = true
@@ -106,6 +111,7 @@ export default function MiniappRewardsPage() {
     return () => {
       active = false
     }
+  // Intentionally run once on first mount to bootstrap Telegram/browser identity and initial profile.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
