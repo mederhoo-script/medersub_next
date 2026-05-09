@@ -22,6 +22,7 @@ export default function EducationPage() {
     const [loadingServices, setLoadingServices] = useState(true);
     const [selectedService, setSelectedService] = useState<EducationService | null>(null);
     const [quantity, setQuantity] = useState(1);
+    const [paymentSource, setPaymentSource] = useState<'wallet' | 'reward'>('wallet');
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
     const [purchasedPins, setPurchasedPins] = useState<PurchasedPin[]>([]);
@@ -79,7 +80,8 @@ export default function EducationPage() {
                     amount: totalAmount,
                     mobileNumber: '', // Not needed for education
                     serviceID: selectedService.serviceID,
-                    quantity: quantity
+                    quantity: quantity,
+                    paymentSource
                 })
             });
 
@@ -173,6 +175,18 @@ export default function EducationPage() {
                             />
                         </div>
                     )}
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Source</label>
+                        <select
+                            value={paymentSource}
+                            onChange={(e) => setPaymentSource(e.target.value as 'wallet' | 'reward')}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                        >
+                            <option value="wallet">Main Wallet</option>
+                            <option value="reward">Reward Balance</option>
+                        </select>
+                    </div>
 
                     {/* Total Amount Display */}
                     {selectedService && (

@@ -23,6 +23,7 @@ export default function DataPage() {
     const [loadingPlans, setLoadingPlans] = useState(true);
     const [plan, setPlan] = useState<any>(null);
     const [phone, setPhone] = useState('');
+    const [paymentSource, setPaymentSource] = useState<'wallet' | 'reward'>('wallet');
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
     const [allDataPlans, setAllDataPlans] = useState<any[]>([]);
@@ -81,7 +82,8 @@ export default function DataPage() {
                     mobileNumber: phone,
                     serviceID: plan.serviceID,
                     network: network.id,
-                    planName: plan.dataPlan // Send planName for markup calculation
+                    planName: plan.dataPlan, // Send planName for markup calculation
+                    paymentSource
                 })
             });
 
@@ -188,6 +190,18 @@ export default function DataPage() {
                                 placeholder="08012345678"
                             />
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Source</label>
+                        <select
+                            value={paymentSource}
+                            onChange={(e) => setPaymentSource(e.target.value as 'wallet' | 'reward')}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                        >
+                            <option value="wallet">Main Wallet</option>
+                            <option value="reward">Reward Balance</option>
+                        </select>
                     </div>
 
                     {status && (

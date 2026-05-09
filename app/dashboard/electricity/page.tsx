@@ -21,6 +21,7 @@ export default function ElectricityPage() {
     const [meterType, setMeterType] = useState(METER_TYPES[0]);
     const [meterNum, setMeterNum] = useState('');
     const [amount, setAmount] = useState('');
+    const [paymentSource, setPaymentSource] = useState<'wallet' | 'reward'>('wallet');
 
     const [validating, setValidating] = useState(false);
     const [customerName, setCustomerName] = useState<string | null>(null);
@@ -109,7 +110,8 @@ export default function ElectricityPage() {
                     mobileNumber: meterNum, // meterNum acts as mobileNumber
                     serviceID: selectedDisco.serviceID,
                     network: selectedDisco.disco, // For tracking name
-                    meterType: meterType.id
+                    meterType: meterType.id,
+                    paymentSource
                 })
             });
 
@@ -248,6 +250,18 @@ export default function ElectricityPage() {
                                 <span className="text-lg font-bold text-green-600">₦{getToPay().toLocaleString()}</span>
                             </div>
                         )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Source</label>
+                        <select
+                            value={paymentSource}
+                            onChange={(e) => setPaymentSource(e.target.value as 'wallet' | 'reward')}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
+                        >
+                            <option value="wallet">Main Wallet</option>
+                            <option value="reward">Reward Balance</option>
+                        </select>
                     </div>
 
                     {status && (
