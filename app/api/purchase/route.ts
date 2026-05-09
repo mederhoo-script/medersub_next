@@ -157,7 +157,7 @@ export async function POST(req: Request) {
                 if (typeof rpcBalance === 'number' && Number.isFinite(rpcBalance)) {
                     newBalance = rpcBalance;
                 } else {
-                    throw new Error(`Reward spend RPC returned invalid balance. Expected numeric value but got: ${String(rewardSpendBalance)}`);
+                    throw new Error(`Reward spend RPC returned invalid balance. Expected numeric value but got: ${String(rewardSpendBalance)}. Check reward RPC deployment and response format.`);
                 }
             }
         } else {

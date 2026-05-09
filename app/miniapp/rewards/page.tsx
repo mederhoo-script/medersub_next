@@ -18,6 +18,7 @@ type RewardProfile = {
 // Keep the required placeholder as fallback for local/example environments.
 const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || 'MONETAG_ZONE_ID_HERE'
 const BROWSER_UID_DIGIT_COUNT = 6
+const BROWSER_UID_RANGE = 1_000_000
 
 function getOrCreateBrowserUid(): string {
   const key = 'miniapp_reward_uid'
@@ -25,8 +26,14 @@ function getOrCreateBrowserUid(): string {
   if (existing && BROWSER_REWARD_UID_REGEX.test(existing)) return existing
 
   const random = new Uint32Array(1)
-  globalThis.crypto.getRandomValues(random)
-  const digits = String(random[0] % 1_000_000).padStart(BROWSER_UID_DIGIT_COUNT, '0')
+  const maxUnbiased = Math.floor(0x1_0000_0000 / BROWSER_UID_RANGE) * BROWSER_UID_RANGE
+  let sampled = 0
+  do {
+    globalThis.crypto.getRandomValues(random)
+    sampled = random[0]
+  } while (sampled >= maxUnbiased)
+
+  const digits = String(sampled % BROWSER_UID_RANGE).padStart(BROWSER_UID_DIGIT_COUNT, '0')
   const generated = `USR${digits}`
   window.localStorage.setItem(key, generated)
   return generated

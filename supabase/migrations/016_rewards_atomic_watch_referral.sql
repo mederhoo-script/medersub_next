@@ -135,7 +135,7 @@ begin
       v_bonus_reward,
       jsonb_build_object(
         'reward_uid', p_reward_uid,
-        'rule', 'every_5_ads'
+        'rule', format('every_%s_ads', p_bonus_every_n_ads)
       )
     );
   end if;
