@@ -21,7 +21,8 @@ function verifyTelegramInitData(initData: string, botToken: string): boolean {
 
   try {
     return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(hash, 'hex'))
-  } catch {
+  } catch (error) {
+    console.warn('[rewards] Telegram init data signature comparison failed:', error)
     return false
   }
 }

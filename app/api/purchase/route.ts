@@ -136,14 +136,27 @@ export async function POST(req: Request) {
         }
 
         // 3. Deduct Total Charge from selected balance
-        const newBalance = currentBalance - totalCharge;
+        let newBalance = currentBalance - totalCharge;
         let balanceUpdateError: { message?: string } | null = null;
         if (selectedPaymentSource === 'reward') {
-            const rewardUpdate = await supabaseAdmin
-                .from('profiles')
-                .update({ reward_balance_ngn: newBalance })
-                .eq('id', userId);
-            balanceUpdateError = rewardUpdate.error;
+            const { data: rewardSpendBalance, error: rewardSpendError } = await supabaseAdmin.rpc('spend_reward_on_vtu', {
+                p_user_id: userId,
+                p_amount: totalCharge,
+                p_meta: {
+                    service_type: serviceType,
+                    service_id: serviceID,
+                    provider_ref: apiResponse.data?.reference || null,
+                    payment_source: 'reward',
+                }
+            });
+            if (rewardSpendError) {
+                balanceUpdateError = rewardSpendError;
+            } else {
+                const rpcBalance = Number(rewardSpendBalance);
+                if (!Number.isNaN(rpcBalance)) {
+                    newBalance = rpcBalance;
+                }
+            }
         } else {
             const walletUpdate = await supabaseAdmin
                 .from('wallets')
@@ -176,23 +189,6 @@ export async function POST(req: Request) {
                 ...(serviceType === 'EDUCATION' && apiResponse.data?.pins ? { pins: apiResponse.data.pins } : {})
             }
         });
-
-        if (selectedPaymentSource === 'reward') {
-            const { error: rewardLedgerError } = await supabaseAdmin.from('reward_transactions').insert({
-                user_id: userId,
-                type: 'spend_on_vtu',
-                amount_ngn: -totalCharge,
-                meta: {
-                    service_type: serviceType,
-                    service_id: serviceID,
-                    provider_ref: apiResponse.data?.reference || null,
-                    payment_source: 'reward',
-                }
-            });
-            if (rewardLedgerError) {
-                console.error('Failed to insert reward spend ledger', userId, totalCharge, rewardLedgerError);
-            }
-        }
 
         return NextResponse.json({
             success: true,
