@@ -156,6 +156,8 @@ export async function POST(req: Request) {
                 const rpcBalance = rewardSpendBalance as number | null;
                 if (typeof rpcBalance === 'number' && Number.isFinite(rpcBalance)) {
                     newBalance = rpcBalance;
+                } else {
+                    throw new Error('Reward spend RPC returned invalid balance');
                 }
             }
         } else {

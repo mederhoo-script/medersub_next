@@ -2,7 +2,8 @@ import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { BROWSER_REWARD_UID_REGEX, TELEGRAM_AUTH_VALIDITY_SECONDS, TELEGRAM_REWARD_UID_REGEX } from '@/lib/reward-constants'
 
-const TELEGRAM_EMAIL_DOMAIN = process.env.TELEGRAM_EMAIL_DOMAIN ?? 'medersub.local'
+const DEFAULT_TELEGRAM_EMAIL_DOMAIN = 'medersub.local'
+const TELEGRAM_EMAIL_DOMAIN = process.env.TELEGRAM_EMAIL_DOMAIN ?? DEFAULT_TELEGRAM_EMAIL_DOMAIN
 const parsedReferralBonus = Number(process.env.REWARD_REFERRAL_BONUS_NGN ?? 5)
 const REFERRAL_BONUS_NGN = Number.isNaN(parsedReferralBonus) ? 5 : parsedReferralBonus
 

@@ -17,6 +17,8 @@ type RewardProfile = {
 
 // Keep the required placeholder as fallback for local/example environments.
 const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || 'MONETAG_ZONE_ID_HERE'
+const BROWSER_UID_DIGIT_COUNT = 6
+// Small load delay gives the Monetag script time to register `show_<zoneId>` on window.
 const MONETAG_SCRIPT_LOAD_DELAY_MS = 1200
 
 function getOrCreateBrowserUid(): string {
@@ -25,11 +27,11 @@ function getOrCreateBrowserUid(): string {
   if (existing && BROWSER_REWARD_UID_REGEX.test(existing)) return existing
 
   let digits = ''
-  while (digits.length < 6) {
+  while (digits.length < BROWSER_UID_DIGIT_COUNT) {
     digits += globalThis.crypto.randomUUID().replace(/\D/g, '')
   }
 
-  const generated = `USR${digits.slice(0, 6)}`
+  const generated = `USR${digits.slice(0, BROWSER_UID_DIGIT_COUNT)}`
   window.localStorage.setItem(key, generated)
   return generated
 }
