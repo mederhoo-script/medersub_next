@@ -3,7 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { REWARD_UID_REGEX, TELEGRAM_AUTH_VALIDITY_SECONDS } from '@/lib/reward-constants'
 
 const TELEGRAM_EMAIL_DOMAIN = process.env.TELEGRAM_EMAIL_DOMAIN ?? 'medersub.local'
-const REFERRAL_BONUS_NGN = Number(process.env.REWARD_REFERRAL_BONUS_NGN ?? 5) || 5
+const parsedReferralBonus = Number(process.env.REWARD_REFERRAL_BONUS_NGN ?? 5)
+const REFERRAL_BONUS_NGN = Number.isNaN(parsedReferralBonus) ? 5 : parsedReferralBonus
 
 function verifyTelegramInitData(initData: string, botToken: string): boolean {
   const params = new URLSearchParams(initData)
