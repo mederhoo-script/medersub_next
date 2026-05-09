@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
-import { BROWSER_REWARD_UID_REGEX } from '@/lib/reward-constants'
+import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
 
 type RewardProfile = {
   uid: string
@@ -18,8 +18,6 @@ type RewardProfile = {
 // Keep the required placeholder as fallback for local/example environments.
 const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || 'MONETAG_ZONE_ID_HERE'
 const BROWSER_UID_DIGIT_COUNT = 6
-// Small load delay gives the Monetag script time to register `show_<zoneId>` on window.
-const MONETAG_SCRIPT_LOAD_DELAY_MS = 1200
 
 function getOrCreateBrowserUid(): string {
   const key = 'miniapp_reward_uid'
