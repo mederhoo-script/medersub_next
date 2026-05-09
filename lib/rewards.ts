@@ -106,9 +106,9 @@ export async function resolveRewardUser(identity: RewardIdentityInput): Promise<
 
     telegramId = String(tgUser.id)
     telegramUsername = (tgUser.username as string) || null
-    const first = (tgUser.first_name as string) || ''
-    const last = (tgUser.last_name as string) || ''
-    fullName = `${first} ${last}`.trim() || telegramUsername || `User ${telegramId}`
+    const firstNameValue = (tgUser.first_name as string) || ''
+    const lastNameValue = (tgUser.last_name as string) || ''
+    fullName = `${firstNameValue} ${lastNameValue}`.trim() || telegramUsername || `User ${telegramId}`
     canonicalRewardUid = `TG-${telegramId}`
     if (!TELEGRAM_REWARD_UID_REGEX.test(canonicalRewardUid)) throw new Error('Invalid Telegram reward uid')
   } else {

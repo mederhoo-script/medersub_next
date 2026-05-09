@@ -15,6 +15,7 @@ type RewardProfile = {
   reward_referral_earnings_ngn: number
 }
 
+// Keep the required placeholder as fallback for local/example environments.
 const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || 'MONETAG_ZONE_ID_HERE'
 
 function getOrCreateBrowserUid(): string {

@@ -152,7 +152,9 @@ export async function POST(req: Request) {
             if (rewardSpendError) {
                 balanceUpdateError = rewardSpendError;
             } else {
-                const rpcBalance = Number(rewardSpendBalance);
+                const rpcBalance = typeof rewardSpendBalance === 'number'
+                    ? rewardSpendBalance
+                    : Number(rewardSpendBalance);
                 if (!Number.isNaN(rpcBalance)) {
                     newBalance = rpcBalance;
                 }
