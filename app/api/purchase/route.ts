@@ -178,7 +178,7 @@ export async function POST(req: Request) {
         });
 
         if (selectedPaymentSource === 'reward') {
-            await supabaseAdmin.from('reward_transactions').insert({
+            const { error: rewardLedgerError } = await supabaseAdmin.from('reward_transactions').insert({
                 user_id: userId,
                 type: 'spend_on_vtu',
                 amount_ngn: -totalCharge,
@@ -189,6 +189,9 @@ export async function POST(req: Request) {
                     payment_source: 'reward',
                 }
             });
+            if (rewardLedgerError) {
+                console.error('Failed to insert reward spend ledger', userId, totalCharge, rewardLedgerError);
+            }
         }
 
         return NextResponse.json({

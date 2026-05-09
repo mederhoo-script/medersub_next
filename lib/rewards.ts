@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { REWARD_UID_REGEX, TELEGRAM_AUTH_VALIDITY_SECONDS } from '@/lib/reward-constants'
+import { BROWSER_REWARD_UID_REGEX, TELEGRAM_AUTH_VALIDITY_SECONDS, TELEGRAM_REWARD_UID_REGEX } from '@/lib/reward-constants'
 
 const TELEGRAM_EMAIL_DOMAIN = process.env.TELEGRAM_EMAIL_DOMAIN ?? 'medersub.local'
 const parsedReferralBonus = Number(process.env.REWARD_REFERRAL_BONUS_NGN ?? 5)
@@ -109,9 +109,10 @@ export async function resolveRewardUser(identity: RewardIdentityInput): Promise<
     const last = (tgUser.last_name as string) || ''
     fullName = `${first} ${last}`.trim() || telegramUsername || `User ${telegramId}`
     canonicalRewardUid = `TG-${telegramId}`
+    if (!TELEGRAM_REWARD_UID_REGEX.test(canonicalRewardUid)) throw new Error('Invalid Telegram reward uid')
   } else {
     if (!rewardUid) throw new Error('rewardUid is required outside Telegram')
-    if (!REWARD_UID_REGEX.test(rewardUid)) throw new Error('Invalid rewardUid format')
+    if (!BROWSER_REWARD_UID_REGEX.test(rewardUid)) throw new Error('Invalid rewardUid format')
     canonicalRewardUid = rewardUid
     fullName = firstName || username || `User ${rewardUid.slice(3)}`
   }

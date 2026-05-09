@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
-import { REWARD_UID_REGEX } from '@/lib/reward-constants'
+import { BROWSER_REWARD_UID_REGEX } from '@/lib/reward-constants'
 
 type RewardProfile = {
   uid: string
@@ -20,7 +20,7 @@ const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || 'MONETAG_ZONE
 function getOrCreateBrowserUid(): string {
   const key = 'miniapp_reward_uid'
   const existing = window.localStorage.getItem(key)
-  if (existing && REWARD_UID_REGEX.test(existing)) return existing
+  if (existing && BROWSER_REWARD_UID_REGEX.test(existing)) return existing
 
   let digits = ''
   while (digits.length < 6) {
@@ -59,12 +59,7 @@ export default function MiniappRewardsPage() {
   const [identity, setIdentity] = useState<{ initData?: string; rewardUid?: string; firstName?: string; username?: string }>({})
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
-  const loadProfile = async (overrides?: { initData?: string; rewardUid?: string; firstName?: string; username?: string }) => {
-    const payload = {
-      ...identity,
-      ...overrides,
-      referredBy,
-    }
+  const fetchProfile = async (payload: { initData?: string; rewardUid?: string; firstName?: string; username?: string; referredBy?: string }) => {
     const res = await fetch('/api/rewards/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -73,6 +68,14 @@ export default function MiniappRewardsPage() {
     const data = await res.json()
     if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to load rewards')
     setProfile(data.user as RewardProfile)
+  }
+
+  const loadProfile = async (overrides?: { initData?: string; rewardUid?: string; firstName?: string; username?: string }) => {
+    await fetchProfile({
+      ...identity,
+      ...overrides,
+      referredBy,
+    })
   }
 
   useEffect(() => {
@@ -97,13 +100,13 @@ export default function MiniappRewardsPage() {
           }
           if (!active) return
           setIdentity(nextIdentity)
-          await loadProfile(nextIdentity)
+          await fetchProfile({ ...nextIdentity, referredBy: refParam })
         } else {
           const uid = getOrCreateBrowserUid()
           const nextIdentity = { rewardUid: uid }
           if (!active) return
           setIdentity(nextIdentity)
-          await loadProfile(nextIdentity)
+          await fetchProfile({ ...nextIdentity, referredBy: refParam })
         }
       } catch (err: unknown) {
         const text = err instanceof Error ? err.message : 'Failed to initialize rewards app'
@@ -115,8 +118,6 @@ export default function MiniappRewardsPage() {
     return () => {
       active = false
     }
-  // Intentionally run once on first mount to bootstrap Telegram/browser identity and initial profile.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleWatchAndEarn = async () => {

@@ -16,62 +16,21 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ ok: false, error: 'status must be approved or rejected' }, { status: 400 })
     }
 
-    const { data: withdrawal, error: fetchError } = await supabaseAdmin
-      .from('reward_withdrawals')
-      .select('*')
-      .eq('id', withdrawalId)
-      .single()
+    const { error: reviewError } = await supabaseAdmin.rpc('review_reward_withdrawal', {
+      p_withdrawal_id: withdrawalId,
+      p_status: status,
+      p_note: note,
+    })
 
-    if (fetchError || !withdrawal) {
-      return NextResponse.json({ ok: false, error: 'Withdrawal not found' }, { status: 404 })
-    }
-
-    if (withdrawal.status !== 'pending') {
-      return NextResponse.json({ ok: false, error: 'Withdrawal already reviewed' }, { status: 400 })
-    }
-
-    await supabaseAdmin
-      .from('reward_withdrawals')
-      .update({
-        status,
-        reviewed_at: new Date().toISOString(),
-        review_note: note,
-      })
-      .eq('id', withdrawalId)
-
-    if (status === 'rejected') {
-      const { data: userProfile, error: userError } = await supabaseAdmin
-        .from('profiles')
-        .select('reward_balance_ngn')
-        .eq('id', withdrawal.user_id)
-        .single()
-
-      if (!userError && userProfile) {
-        const previousBalance = Number(userProfile.reward_balance_ngn || 0)
-        const refundedBalance = Number(userProfile.reward_balance_ngn || 0) + Number(withdrawal.amount_ngn || 0)
-        await supabaseAdmin
-          .from('profiles')
-          .update({ reward_balance_ngn: refundedBalance })
-          .eq('id', withdrawal.user_id)
-
-        const { error: refundTxError } = await supabaseAdmin.from('reward_transactions').insert({
-          user_id: withdrawal.user_id,
-          type: 'withdraw_refund',
-          amount_ngn: Number(withdrawal.amount_ngn || 0),
-          meta: {
-            withdrawal_id: withdrawal.id,
-            reason: note || 'Admin rejected withdrawal',
-          },
-        })
-
-        if (refundTxError) {
-          await supabaseAdmin
-            .from('profiles')
-            .update({ reward_balance_ngn: previousBalance })
-            .eq('id', withdrawal.user_id)
-          throw new Error(refundTxError.message)
-        }
+    if (reviewError) {
+      const msg = reviewError.message.toLowerCase()
+      if (msg.includes('not found')) {
+        return NextResponse.json({ ok: false, error: 'Withdrawal not found' }, { status: 404 })
       }
+      if (msg.includes('already reviewed') || msg.includes('approved or rejected')) {
+        return NextResponse.json({ ok: false, error: reviewError.message }, { status: 400 })
+      }
+      throw new Error(reviewError.message)
     }
 
     return NextResponse.json({ ok: true })
