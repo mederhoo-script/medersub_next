@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
+import { REWARD_UID_REGEX } from '@/lib/reward-constants'
 
 type RewardProfile = {
   uid: string
@@ -19,19 +20,19 @@ const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || 'MONETAG_ZONE
 function getOrCreateBrowserUid(): string {
   const key = 'miniapp_reward_uid'
   const existing = window.localStorage.getItem(key)
-  if (existing && /^USR\d{5,}$/.test(existing)) return existing
+  if (existing && REWARD_UID_REGEX.test(existing)) return existing
 
-  const random = globalThis.crypto.getRandomValues(new Uint32Array(1))[0] % 90000
-  const generated = `USR${String(10000 + random).padStart(5, '0')}`
+  let digits = ''
+  while (digits.length < 6) {
+    digits += globalThis.crypto.randomUUID().replace(/\D/g, '')
+  }
+
+  const generated = `USR${digits.slice(0, 6)}`
   window.localStorage.setItem(key, generated)
   return generated
 }
 
 async function triggerMonetagRewardedInterstitial(): Promise<void> {
-  if (MONETAG_ZONE_ID === 'MONETAG_ZONE_ID_HERE') {
-    console.warn('NEXT_PUBLIC_MONETAG_ZONE_ID is not set; using MONETAG_ZONE_ID_HERE placeholder.')
-  }
-
   if (!document.querySelector(`script[data-monetag-zone="${MONETAG_ZONE_ID}"]`)) {
     const script = document.createElement('script')
     script.async = true
@@ -79,6 +80,9 @@ export default function MiniappRewardsPage() {
     ;(async () => {
       try {
         setOrigin(window.location.origin)
+        if (MONETAG_ZONE_ID === 'MONETAG_ZONE_ID_HERE') {
+          console.warn('NEXT_PUBLIC_MONETAG_ZONE_ID is not set; using MONETAG_ZONE_ID_HERE placeholder.')
+        }
         const refParam = new URLSearchParams(window.location.search).get('ref') || undefined
         setReferredBy(refParam)
         const tg = (window as any).Telegram?.WebApp

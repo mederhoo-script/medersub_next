@@ -22,6 +22,7 @@ export async function POST(req: Request) {
     }
 
     const newBalance = user.rewardBalance - amount
+    let withdrawalId: number | null = null
 
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
@@ -32,20 +33,47 @@ export async function POST(req: Request) {
       throw new Error(updateError.message)
     }
 
-    await supabaseAdmin.from('reward_withdrawals').insert({
+    const { data: createdWithdrawal, error: withdrawalError } = await supabaseAdmin
+      .from('reward_withdrawals')
+      .insert({
       user_id: user.profileId,
       amount_ngn: amount,
       status: 'pending',
-    })
+      })
+      .select('id')
+      .single()
 
-    await supabaseAdmin.from('reward_transactions').insert({
+    if (withdrawalError || !createdWithdrawal) {
+      await supabaseAdmin
+        .from('profiles')
+        .update({ reward_balance_ngn: user.rewardBalance })
+        .eq('id', user.profileId)
+      throw new Error(withdrawalError?.message || 'Failed to create withdrawal')
+    }
+
+    withdrawalId = createdWithdrawal.id as number
+
+    const { error: rewardTxError } = await supabaseAdmin.from('reward_transactions').insert({
       user_id: user.profileId,
       type: 'withdraw_request',
       amount_ngn: -amount,
       meta: {
         reward_uid: user.rewardUid,
+        withdrawal_id: withdrawalId,
       },
     })
+
+    if (rewardTxError) {
+      await supabaseAdmin
+        .from('reward_withdrawals')
+        .delete()
+        .eq('id', withdrawalId)
+      await supabaseAdmin
+        .from('profiles')
+        .update({ reward_balance_ngn: user.rewardBalance })
+        .eq('id', user.profileId)
+      throw new Error(rewardTxError.message)
+    }
 
     return NextResponse.json({
       ok: true,

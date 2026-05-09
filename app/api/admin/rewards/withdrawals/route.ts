@@ -47,13 +47,14 @@ export async function PATCH(req: Request) {
         .single()
 
       if (!userError && userProfile) {
+        const previousBalance = Number(userProfile.reward_balance_ngn || 0)
         const refundedBalance = Number(userProfile.reward_balance_ngn || 0) + Number(withdrawal.amount_ngn || 0)
         await supabaseAdmin
           .from('profiles')
           .update({ reward_balance_ngn: refundedBalance })
           .eq('id', withdrawal.user_id)
 
-        await supabaseAdmin.from('reward_transactions').insert({
+        const { error: refundTxError } = await supabaseAdmin.from('reward_transactions').insert({
           user_id: withdrawal.user_id,
           type: 'withdraw_refund',
           amount_ngn: Number(withdrawal.amount_ngn || 0),
@@ -62,6 +63,14 @@ export async function PATCH(req: Request) {
             reason: note || 'Admin rejected withdrawal',
           },
         })
+
+        if (refundTxError) {
+          await supabaseAdmin
+            .from('profiles')
+            .update({ reward_balance_ngn: previousBalance })
+            .eq('id', withdrawal.user_id)
+          throw new Error(refundTxError.message)
+        }
       }
     }
 
