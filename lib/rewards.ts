@@ -195,38 +195,14 @@ export async function applyReferralIfEligible(user: RewardResolvedUser, referred
   if (user.rewardReferredBy) return
   if (referredBy === user.rewardUid) return
 
-  const { data: referrer } = await supabaseAdmin
-    .from('profiles')
-    .select('id,reward_uid,reward_balance_ngn,reward_referrals_count,reward_referral_earnings_ngn')
-    .eq('reward_uid', referredBy)
-    .maybeSingle()
-
-  if (!referrer?.id) return
-
-  const referralBonus = REFERRAL_BONUS_NGN
-  await supabaseAdmin
-    .from('profiles')
-    .update({
-      reward_referred_by: referredBy,
-    })
-    .eq('id', user.profileId)
-
-  await supabaseAdmin
-    .from('profiles')
-    .update({
-      reward_balance_ngn: Number(referrer.reward_balance_ngn || 0) + referralBonus,
-      reward_referrals_count: Number(referrer.reward_referrals_count || 0) + 1,
-      reward_referral_earnings_ngn: Number(referrer.reward_referral_earnings_ngn || 0) + referralBonus,
-    })
-    .eq('id', referrer.id)
-
-  await supabaseAdmin.from('reward_transactions').insert({
-    user_id: referrer.id,
-    type: 'referral_reward',
-    amount_ngn: referralBonus,
-    meta: {
-      source_uid: user.rewardUid,
-      reward_uid: referrer.reward_uid,
-    },
+  const { error } = await supabaseAdmin.rpc('apply_reward_referral', {
+    p_user_id: user.profileId,
+    p_referred_by: referredBy,
+    p_source_uid: user.rewardUid,
+    p_referral_bonus: REFERRAL_BONUS_NGN,
   })
+
+  if (error) {
+    throw new Error(error.message)
+  }
 }

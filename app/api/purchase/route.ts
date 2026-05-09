@@ -137,23 +137,23 @@ export async function POST(req: Request) {
 
         // 3. Deduct Total Charge from selected balance
         const newBalance = currentBalance - totalCharge;
-        let updateError: { message?: string } | null = null;
+        let balanceUpdateError: { message?: string } | null = null;
         if (selectedPaymentSource === 'reward') {
             const rewardUpdate = await supabaseAdmin
                 .from('profiles')
                 .update({ reward_balance_ngn: newBalance })
                 .eq('id', userId);
-            updateError = rewardUpdate.error;
+            balanceUpdateError = rewardUpdate.error;
         } else {
             const walletUpdate = await supabaseAdmin
                 .from('wallets')
                 .update({ balance: newBalance })
                 .eq('user_id', userId);
-            updateError = walletUpdate.error;
+            balanceUpdateError = walletUpdate.error;
         }
 
-        if (updateError) {
-            console.error('CRITICAL: Failed to deduct balance', userId, totalCharge, updateError);
+        if (balanceUpdateError) {
+            console.error('CRITICAL: Failed to deduct balance', userId, totalCharge, balanceUpdateError);
         }
 
         // 4. Record Transaction

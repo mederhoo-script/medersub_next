@@ -83,7 +83,7 @@ export default function MiniappRewardsPage() {
     ;(async () => {
       try {
         setOrigin(window.location.origin)
-        if (MONETAG_ZONE_ID === 'MONETAG_ZONE_ID_HERE') {
+        if (process.env.NODE_ENV !== 'production' && MONETAG_ZONE_ID === 'MONETAG_ZONE_ID_HERE') {
           console.warn('NEXT_PUBLIC_MONETAG_ZONE_ID is not set; using MONETAG_ZONE_ID_HERE placeholder.')
         }
         const refParam = new URLSearchParams(window.location.search).get('ref') || undefined
