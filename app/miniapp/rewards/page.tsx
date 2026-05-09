@@ -17,6 +17,7 @@ type RewardProfile = {
 
 // Keep the required placeholder as fallback for local/example environments.
 const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || 'MONETAG_ZONE_ID_HERE'
+const MONETAG_SCRIPT_LOAD_DELAY_MS = 1200
 
 function getOrCreateBrowserUid(): string {
   const key = 'miniapp_reward_uid'
@@ -40,7 +41,7 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
     script.dataset.monetagZone = MONETAG_ZONE_ID
     script.src = `https://5gvci.com/act/files/tag.min.js?z=${MONETAG_ZONE_ID}`
     document.head.appendChild(script)
-    await new Promise(resolve => setTimeout(resolve, 1200))
+    await new Promise(resolve => setTimeout(resolve, MONETAG_SCRIPT_LOAD_DELAY_MS))
   }
 
   const adFn = (window as any)[`show_${MONETAG_ZONE_ID}`]

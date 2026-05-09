@@ -11,6 +11,15 @@ type RewardStats = {
   pending_withdrawals_count: number
 }
 
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-xl font-bold">{value}</p>
+    </div>
+  )
+}
+
 export default function AdminRewardsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<number | null>(null)
@@ -76,11 +85,11 @@ export default function AdminRewardsPage() {
       <h1 className="text-2xl font-bold text-gray-900">Rewards Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-4"><p className="text-xs text-gray-500">Reward Users</p><p className="text-xl font-bold">{data?.stats.users_with_reward_uid || 0}</p></div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4"><p className="text-xs text-gray-500">Outstanding</p><p className="text-xl font-bold">₦{Number(data?.stats.total_reward_outstanding_ngn || 0).toLocaleString()}</p></div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4"><p className="text-xs text-gray-500">Ads Watched</p><p className="text-xl font-bold">{data?.stats.total_ads_watched || 0}</p></div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4"><p className="text-xs text-gray-500">Referral Earnings</p><p className="text-xl font-bold">₦{Number(data?.stats.total_referral_earnings_ngn || 0).toLocaleString()}</p></div>
-        <div className="bg-white rounded-xl border border-gray-200 p-4"><p className="text-xs text-gray-500">Pending Withdrawals</p><p className="text-xl font-bold">{data?.stats.pending_withdrawals_count || 0}</p></div>
+        <StatCard label="Reward Users" value={data?.stats.users_with_reward_uid || 0} />
+        <StatCard label="Outstanding" value={`₦${Number(data?.stats.total_reward_outstanding_ngn || 0).toLocaleString()}`} />
+        <StatCard label="Ads Watched" value={data?.stats.total_ads_watched || 0} />
+        <StatCard label="Referral Earnings" value={`₦${Number(data?.stats.total_referral_earnings_ngn || 0).toLocaleString()}`} />
+        <StatCard label="Pending Withdrawals" value={data?.stats.pending_withdrawals_count || 0} />
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

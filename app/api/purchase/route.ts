@@ -152,10 +152,9 @@ export async function POST(req: Request) {
             if (rewardSpendError) {
                 balanceUpdateError = rewardSpendError;
             } else {
-                const rpcBalance = typeof rewardSpendBalance === 'number'
-                    ? rewardSpendBalance
-                    : Number(rewardSpendBalance);
-                if (!Number.isNaN(rpcBalance)) {
+                // `spend_reward_on_vtu` returns a numeric scalar balance.
+                const rpcBalance = rewardSpendBalance as number | null;
+                if (typeof rpcBalance === 'number' && Number.isFinite(rpcBalance)) {
                     newBalance = rpcBalance;
                 }
             }
