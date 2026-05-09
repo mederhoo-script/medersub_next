@@ -7,7 +7,8 @@ import { calculateDataProfit } from '@/utils/pricing';
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { userId, serviceType, amount, mobileNumber, serviceID, network, planName, meterType, quantity } = body;
+        const { userId, serviceType, amount, mobileNumber, serviceID, network, planName, meterType, quantity, paymentSource } = body;
+        const selectedPaymentSource = paymentSource === 'reward' ? 'reward' : 'wallet';
 
         console.log('Purchase Request:', { userId, serviceType, amount, mobileNumber, planName });
 
@@ -72,19 +73,35 @@ export async function POST(req: Request) {
         // For Data/Others: Charged = Amount + Markup
         const totalCharge = (Number(amount) + markupToApply) - discount;
 
-        // 1. Check User Balance from WALLETS table
-        const { data: wallet, error: walletError } = await supabaseAdmin
-            .from('wallets')
-            .select('balance')
-            .eq('user_id', userId)
-            .single();
+        // 1. Check User Balance based on selected payment source
+        let currentBalance = 0;
+        if (selectedPaymentSource === 'reward') {
+            const { data: profile, error: profileError } = await supabaseAdmin
+                .from('profiles')
+                .select('reward_balance_ngn')
+                .eq('id', userId)
+                .single();
 
-        if (walletError || !wallet) {
-            return NextResponse.json({ error: 'User wallet not found.' }, { status: 404 });
+            if (profileError || !profile) {
+                return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
+            }
+
+            currentBalance = Number(profile.reward_balance_ngn || 0);
+        } else {
+            const { data: wallet, error: walletError } = await supabaseAdmin
+                .from('wallets')
+                .select('balance')
+                .eq('user_id', userId)
+                .single();
+
+            if (walletError || !wallet) {
+                return NextResponse.json({ error: 'User wallet not found.' }, { status: 404 });
+            }
+            currentBalance = Number(wallet.balance);
         }
 
-        if (Number(wallet.balance) < totalCharge) {
-            return NextResponse.json({ error: `Insufficient balance. Required: ₦${totalCharge}` }, { status: 400 });
+        if (currentBalance < totalCharge) {
+            return NextResponse.json({ error: `Insufficient ${selectedPaymentSource} balance. Required: ₦${totalCharge}` }, { status: 400 });
         }
 
         // 2. Call Inlomax API (Send the actual cost to provider, not the charged amount)
@@ -118,12 +135,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: errorMsg, debug: apiResponse }, { status: 502 });
         }
 
-        // 3. Deduct Total Charge from WALLETS
-        const newBalance = Number(wallet.balance) - totalCharge;
-        const { error: updateError } = await supabaseAdmin
-            .from('wallets')
-            .update({ balance: newBalance })
-            .eq('user_id', userId);
+        // 3. Deduct Total Charge from selected balance
+        const newBalance = currentBalance - totalCharge;
+        let updateError: any = null;
+        if (selectedPaymentSource === 'reward') {
+            const rewardUpdate = await supabaseAdmin
+                .from('profiles')
+                .update({ reward_balance_ngn: newBalance })
+                .eq('id', userId);
+            updateError = rewardUpdate.error;
+        } else {
+            const walletUpdate = await supabaseAdmin
+                .from('wallets')
+                .update({ balance: newBalance })
+                .eq('user_id', userId);
+            updateError = walletUpdate.error;
+        }
 
         if (updateError) {
             console.error('CRITICAL: Failed to deduct balance', userId, totalCharge, updateError);
@@ -142,12 +169,27 @@ export async function POST(req: Request) {
                 service_type: serviceType, // 'AIRTIME', 'DATA', 'EDUCATION', etc.
                 mobile: mobileNumber,
                 network: network,
+                payment_source: selectedPaymentSource,
                 provider_ref: apiResponse.data?.reference,
                 markup_applied: markupToApply,
                 profit: markupToApply,
                 ...(serviceType === 'EDUCATION' && apiResponse.data?.pins ? { pins: apiResponse.data.pins } : {})
             }
         });
+
+        if (selectedPaymentSource === 'reward') {
+            await supabaseAdmin.from('reward_transactions').insert({
+                user_id: userId,
+                type: 'spend_on_vtu',
+                amount_ngn: -totalCharge,
+                meta: {
+                    service_type: serviceType,
+                    service_id: serviceID,
+                    provider_ref: apiResponse.data?.reference || null,
+                    payment_source: 'reward',
+                }
+            });
+        }
 
         return NextResponse.json({
             success: true,
