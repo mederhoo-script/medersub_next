@@ -74,7 +74,10 @@ $$;
 
 create or replace function public.claim_reward_watch(
   p_user_id uuid,
-  p_reward_uid text
+  p_reward_uid text,
+  p_base_reward_amount numeric default 10,
+  p_bonus_every_n_ads integer default 5,
+  p_bonus_amount numeric default 5
 )
 returns table (
   earned_ngn numeric,
@@ -89,9 +92,6 @@ as $$
 declare
   v_ads_watched integer;
   v_balance numeric;
-  v_base_reward_amount numeric := 10;
-  v_bonus_every_n_ads integer := 5;
-  v_bonus_amount numeric := 5;
   v_bonus_reward numeric := 0;
   v_total_reward numeric := 0;
 begin
@@ -106,11 +106,11 @@ begin
   end if;
 
   v_ads_watched := v_ads_watched + 1;
-  if mod(v_ads_watched, v_bonus_every_n_ads) = 0 then
-    v_bonus_reward := v_bonus_amount;
+  if mod(v_ads_watched, p_bonus_every_n_ads) = 0 then
+    v_bonus_reward := p_bonus_amount;
   end if;
 
-  v_total_reward := v_base_reward_amount + v_bonus_reward;
+  v_total_reward := p_base_reward_amount + v_bonus_reward;
   v_balance := v_balance + v_total_reward;
 
   update public.profiles
@@ -123,7 +123,7 @@ begin
   values (
     p_user_id,
     'ad_reward',
-    v_base_reward_amount,
+    p_base_reward_amount,
     jsonb_build_object('reward_uid', p_reward_uid)
   );
 

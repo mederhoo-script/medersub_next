@@ -24,12 +24,10 @@ function getOrCreateBrowserUid(): string {
   const existing = window.localStorage.getItem(key)
   if (existing && BROWSER_REWARD_UID_REGEX.test(existing)) return existing
 
-  let digits = ''
-  while (digits.length < BROWSER_UID_DIGIT_COUNT) {
-    digits += globalThis.crypto.randomUUID().replace(/\D/g, '')
-  }
-
-  const generated = `USR${digits.slice(0, BROWSER_UID_DIGIT_COUNT)}`
+  const random = new Uint32Array(1)
+  globalThis.crypto.getRandomValues(random)
+  const digits = String(random[0] % 1_000_000).padStart(BROWSER_UID_DIGIT_COUNT, '0')
+  const generated = `USR${digits}`
   window.localStorage.setItem(key, generated)
   return generated
 }
@@ -85,6 +83,9 @@ export default function MiniappRewardsPage() {
     ;(async () => {
       try {
         setOrigin(window.location.origin)
+        if (process.env.NODE_ENV === 'production' && MONETAG_ZONE_ID === 'MONETAG_ZONE_ID_HERE') {
+          throw new Error('Monetag zone ID is not configured')
+        }
         if (process.env.NODE_ENV !== 'production' && MONETAG_ZONE_ID === 'MONETAG_ZONE_ID_HERE') {
           console.warn('NEXT_PUBLIC_MONETAG_ZONE_ID is not set; using MONETAG_ZONE_ID_HERE placeholder.')
         }
