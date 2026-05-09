@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
-import { useSearchParams } from 'next/navigation'
 
 type RewardProfile = {
   uid: string
@@ -44,8 +43,7 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
 }
 
 export default function MiniappRewardsPage() {
-  const searchParams = useSearchParams()
-  const referredBy = useMemo(() => searchParams.get('ref') || undefined, [searchParams])
+  const [referredBy, setReferredBy] = useState<string | undefined>(undefined)
 
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -76,6 +74,8 @@ export default function MiniappRewardsPage() {
     ;(async () => {
       try {
         setOrigin(window.location.origin)
+        const refParam = new URLSearchParams(window.location.search).get('ref') || undefined
+        setReferredBy(refParam)
         const tg = (window as any).Telegram?.WebApp
         if (tg?.ready) tg.ready()
 
