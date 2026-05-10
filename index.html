@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reward Pro</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src='//libtl.com/sdk.js' data-zone='HERE' data-sdk='show_XXXXXXX'></script>
+    <style>
+        :root { --p: #00c853; --b: #4285f4; --bg: #0a0a0a; --c: #1c1c1c; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; height: 100vh; overflow: hidden; }
+        .app { display: flex; flex-direction: column; height: 100vh; }
+        .header { background: linear-gradient(135deg, var(--p), var(--b)); padding: 25px; text-align: center; border-radius: 0 0 25px 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.4); }
+        .main { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 100px; }
+        .card { background: var(--c); padding: 20px; border-radius: 18px; margin-bottom: 15px; border: 1px solid #333; }
+        .btn { width: 100%; padding: 16px; border-radius: 14px; border: none; color: white; font-weight: bold; cursor: pointer; font-size: 16px; margin-bottom: 12px; }
+        .btn-p { background: var(--p); box-shadow: 0 4px 0 #008a39; }
+        .btn-p:active { transform: translateY(2px); box-shadow: 0 2px 0 #008a39; }
+        .btn-s { background: var(--b); }
+        .nav { position: fixed; bottom: 0; width: 100%; height: 75px; background: #111; display: flex; border-top: 1px solid #333; }
+        .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #777; font-size: 11px; text-decoration: none; font-weight: bold; }
+        .nav-item.active { color: var(--p); }
+        .nav-icon { font-size: 22px; margin-bottom: 3px; }
+        .tab { display: none; } .tab.active { display: block; }
+        input, select { width: 100%; padding: 14px; background: #000; border: 1px solid #444; color: white; border-radius: 10px; margin: 8px 0; }
+        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); padding: 10px 20px; border-radius: 20px; display: none; z-index: 9999; border: 1px solid var(--p); }
+    </style>
+</head>
+<body>
+    <div id="toast"></div>
+    <div class="app">
+        <div class="header">
+            <span id="u-name">Welcome</span><br>
+            <b style="font-size: 28px;">$<span id="bal">0.00</span></b>
+        </div>
+        <div class="main">
+            <div id="t-watch" class="tab active">
+                <div class="card"><h4>Ads Watched</h4><h2 id="ads">0</h2></div>
+                <button class="btn btn-p" onclick="watchAd()">📺 WATCH AD (+0.50)</button>
+                <button class="btn btn-s" id="auto-btn" onclick="toggleAuto()">🔄 START AUTO ADS</button>
+            </div>
+            <div id="t-refer" class="tab">
+                <div class="card">
+                    <h3>🤝 Refer & Earn</h3>
+                    <p>Invite friends and earn $2.00 per referral!</p>
+                    <input type="text" id="ref-link" readonly>
+                    <button class="btn btn-p" style="margin-top:10px" onclick="copyRef()">📋 COPY LINK</button>
+                </div>
+            </div>
+            <div id="t-withdraw" class="tab">
+                <div class="card">
+                    <h3>💰 Withdraw</h3>
+                    <select id="net"><option>BEP20</option><option>TRC20</option></select>
+                    <input type="text" id="adr" placeholder="Wallet Address">
+                    <input type="number" id="amt" placeholder="Amount (Min 10.00)">
+                    <button class="btn btn-p" onclick="doWithdraw()">📤 SUBMIT REQUEST</button>
+                </div>
+            </div>
+        </div>
+        <nav class="nav">
+            <a href="#" class="nav-item active" onclick="tab('watch', this)"><span class="nav-icon">📺</span>WATCH</a>
+            <a href="#" class="nav-item" onclick="tab('refer', this)"><span class="nav-icon">🤝</span>REFERRAL</a>
+            <a href="#" class="nav-item" onclick="tab('withdraw', this)"><span class="nav-icon">💰</span>WITHDRAW</a>
+        </nav>
+    </div>
+    <script>
+        const SB_URL = 'SUPABASE_URL_HERE';
+        const SB_KEY = 'SUPABASE_API_KEY_HERE';
+        const sb = supabase.createClient(SB_URL, SB_KEY);
+        const tg = window.Telegram.WebApp; tg.expand();
+        let user = { id: '', pts: 0, ads: 0 }; let auto = null;
+
+        async function init() {
+            const tUser = tg.initDataUnsafe?.user;
+            const id = tUser ? tUser.id.toString() : '12345';
+            user.id = id; document.getElementById('u-name').innerText = tUser ? tUser.first_name : 'Guest';
+            document.getElementById('ref-link').value = `https://t.me/YourBotUser/app?startapp=TG-${id}`;
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const ref = urlParams.get('startapp')?.replace('TG-', '');
+            await sb.rpc('register_user', { new_id: id, ref_id: ref });
+
+            const { data } = await sb.from('users').select('*').eq('user_identifier', id).single();
+            if(data) { user.pts = parseFloat(data.points); user.ads = data.total_watched; }
+            updateUI();
+        }
+
+        function updateUI() { 
+            document.getElementById('bal').innerText = user.pts.toFixed(2);
+            document.getElementById('ads').innerText = user.ads;
+        }
+
+        function tab(id, el) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('t-'+id).classList.add('active'); el.classList.add('active');
+            tg.HapticFeedback.selectionChanged();
+        }
+
+        async function watchAd() {
+            msg("Loading Ad...");
+            const runAd = typeof show_XXXXXXXX === 'function' ? show_XXXXXXXX : () => new Promise(r => setTimeout(r, 2000));
+            try {
+                await runAd(); user.ads++; user.pts += 0.50;
+                await sb.from('users').update({ points: user.pts, total_watched: user.ads }).eq('user_identifier', user.id);
+                updateUI(); msg("Earned +$0.50!"); tg.HapticFeedback.notificationOccurred('success');
+            } catch(e) { msg("Ad failed"); }
+        }
+
+        function toggleAuto() {
+            const b = document.getElementById('auto-btn');
+            if(auto) { clearInterval(auto); auto = null; b.innerText = "🔄 START AUTO ADS"; }
+            else { auto = setInterval(watchAd, 30000); b.innerText = "🛑 STOP AUTO ADS"; msg("Auto Start"); }
+        }
+
+        async function doWithdraw() {
+            const a = parseFloat(document.getElementById('amt').value);
+            const adr = document.getElementById('adr').value;
+            const net = document.getElementById('net').value;
+            if(a < 10 || a > user.pts) return msg("Min $10 / Insufficient balance");
+            const { data } = await sb.rpc('request_withdrawal', { uid: user.id, amt: a, net: net, adr: adr });
+            if(data === 'SUCCESS') { user.pts -= a; updateUI(); msg("Requested!"); }
+        }
+
+        function copyRef() {
+            const i = document.getElementById('ref-link'); i.select(); navigator.clipboard.writeText(i.value); msg("Copied!");
+        }
+
+        function msg(m) {
+            const t = document.getElementById('toast'); t.innerText = m; t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        }
+        window.onload = init;
+    </script>
+</body>
+</html>

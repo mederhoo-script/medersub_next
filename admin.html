@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reward Pro Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <style>
+        :root {
+            --md-sys-color-primary: #D0BCFF;
+            --md-sys-color-on-primary: #381E72;
+            --md-sys-color-surface: #1C1B1F;
+            --md-sys-color-surface-variant: #49454F;
+            --md-sys-color-on-surface: #E6E1E5;
+            --md-sys-color-outline: #938F99;
+            --accent: #D0BCFF;
+            --danger: #F2B8B5;
+            --success: #B4E197;
+        }
+
+        body {
+            background-color: #121212;
+            color: var(--md-sys-color-on-surface);
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Top Bar */
+        .top-app-bar {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            background: #1C1B1F;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .top-app-bar h1 {
+            font-size: 22px;
+            font-weight: 400;
+            margin-left: 16px;
+            flex: 1;
+        }
+
+        /* Content Container */
+        .container {
+            padding: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* Glance Section */
+        .section-title {
+            font-size: 14px;
+            color: var(--md-sys-color-outline);
+            margin: 16px 4px 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .glance-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #25232A;
+            border-radius: 24px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .stat-card .icon { color: var(--accent); margin-bottom: 12px; }
+        .stat-card .label { font-size: 12px; color: var(--md-sys-color-outline); }
+        .stat-card .value { font-size: 24px; font-weight: 500; margin-top: 4px; }
+
+        /* Request List */
+        .request-card {
+            background: #1C1B1F;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .request-info h4 { margin: 0; font-size: 16px; font-weight: 500; }
+        .request-info p { margin: 4px 0 0; font-size: 12px; color: var(--md-sys-color-outline); }
+
+        .chip {
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            background: var(--md-sys-color-surface-variant);
+            margin-left: 8px;
+        }
+
+        /* Action Buttons */
+        .actions { display: flex; gap: 8px; }
+        .btn-icon {
+            background: none;
+            border: none;
+            color: var(--md-sys-color-on-surface);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+        .btn-icon:hover { background: rgba(255,255,255,0.1); }
+        .btn-icon.approve { color: var(--success); }
+        .btn-icon.reject { color: var(--danger); }
+
+        /* FAB */
+        .fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 56px;
+            height: 56px;
+            background: #EADDFF;
+            color: #21005D;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
+        }
+
+        #loader {
+            position: fixed; top: 64px; left: 0; width: 0%; height: 3px;
+            background: var(--accent); transition: width 0.3s; z-index: 101;
+        }
+    </style>
+</head>
+<body>
+    <div id="loader"></div>
+    <div class="top-app-bar">
+        <span class="material-icons-round">settings</span>
+        <h1>Control Center</h1>
+        <span class="material-icons-round" style="color:var(--accent)">account_circle</span>
+    </div>
+
+    <div class="container">
+        <div class="section-title">System Glance</div>
+        <div class="glance-grid">
+            <div class="stat-card">
+                <span class="material-icons-round icon">people</span>
+                <span class="label">Total Users</span>
+                <span class="value" id="count-users">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="material-icons-round icon">account_balance_wallet</span>
+                <span class="label">Pending Debt</span>
+                <span class="value" id="sum-debt">$0.00</span>
+            </div>
+            <div class="stat-card">
+                <span class="material-icons-round icon">payments</span>
+                <span class="label">Total Paid</span>
+                <span class="value" id="sum-paid">$0.00</span>
+            </div>
+            <div class="stat-card">
+                <span class="material-icons-round icon">pending_actions</span>
+                <span class="label">Queue</span>
+                <span class="value" id="count-pending">0</span>
+            </div>
+        </div>
+
+        <div class="section-title">Withdrawal Requests</div>
+        <div id="withdrawal-list">
+            <!-- Items injected here -->
+        </div>
+    </div>
+
+    <div class="fab" onclick="loadData()">
+        <span class="material-icons-round">refresh</span>
+    </div>
+
+    <script>
+        const SB_URL = 'SUPABASE_URL_HERE';
+        const SB_KEY = 'SUPABASE_API_KRY_HERE';
+        const sb = supabase.createClient(SB_URL, SB_KEY);
+
+        async function loadData() {
+            document.getElementById('loader').style.width = '70%';
+            
+            // 1. Load Stats
+            const { data: stats } = await sb.from('admin_stats').select('*').single();
+            if(stats) {
+                document.getElementById('count-users').innerText = stats.total_users;
+                document.getElementById('sum-debt').innerText = '$' + parseFloat(stats.total_debt).toFixed(2);
+                document.getElementById('sum-paid').innerText = '$' + parseFloat(stats.total_paid).toFixed(2);
+                document.getElementById('count-pending').innerText = stats.pending_count;
+            }
+
+            // 2. Load Pending Withdrawals
+            const { data: reqs } = await sb.from('withdrawals').select('*').eq('status', 'pending').order('created_at', {ascending: false});
+            const list = document.getElementById('withdrawal-list');
+            list.innerHTML = reqs.length === 0 ? '<p style="text-align:center;color:#666">No pending requests</p>' : '';
+            
+            reqs.forEach(r => {
+                list.innerHTML += `
+                    <div class="request-card">
+                        <div class="request-info">
+                            <h4>$${r.amount} <span class="chip">${r.network}</span></h4>
+                            <p>${r.user_id}</p>
+                            <p style="font-family:monospace;font-size:10px">${r.address}</p>
+                        </div>
+                        <div class="actions">
+                            <button class="btn-icon reject" onclick="process('${r.id}', 'rejected')">
+                                <span class="material-icons-round">block</span>
+                            </button>
+                            <button class="btn-icon approve" onclick="process('${r.id}', 'approved')">
+                                <span class="material-icons-round">check_circle</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('loader').style.width = '100%';
+            setTimeout(() => document.getElementById('loader').style.width = '0%', 400);
+        }
+
+        async function process(id, status) {
+            if(!confirm(`Move request to ${status}?`)) return;
+            const { error } = await sb.from('withdrawals').update({ status }).eq('id', id);
+            if(!error) loadData();
+        }
+
+        window.onload = loadData;
+        setInterval(loadData, 10000); // Auto refresh every 10s
+    </script>
+</body>
+</html>
