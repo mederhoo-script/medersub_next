@@ -15,7 +15,7 @@ type RewardProfile = {
   reward_referral_earnings_ngn: number
 }
 
-type MonetagAdFn = () => unknown | Promise<unknown>
+type MonetagAdFn = () => void | Promise<void>
 
 type TelegramWebApp = {
   ready?: () => void
