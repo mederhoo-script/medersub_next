@@ -67,7 +67,6 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
     script.setAttribute('data-cfasync', 'false')
     script.dataset.monetagZone = MONETAG_ZONE_ID
     script.src = MONETAG_SCRIPT_SRC
-    document.head.appendChild(script)
     monetagScript = script
   }
 
@@ -102,6 +101,12 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
 
       script.addEventListener('load', onLoad, { once: true })
       script.addEventListener('error', onError, { once: true })
+
+      if (!script.isConnected) {
+        document.head.appendChild(script)
+      } else if (typeof monetagWindow[showFnName] === 'function') {
+        finish(resolve)
+      }
     })
 
     await new Promise(resolve => setTimeout(resolve, MONETAG_SCRIPT_LOAD_DELAY_MS))
