@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
-import { BROWSER_REWARD_UID_REGEX, MONETAG_DEFAULT_ZONE_ID, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
+import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
 
 type RewardProfile = {
   uid: string
@@ -15,7 +15,7 @@ type RewardProfile = {
   reward_referral_earnings_ngn: number
 }
 
-const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID?.trim() || MONETAG_DEFAULT_ZONE_ID
+const MONETAG_ZONE_ID = '10985896'
 const BROWSER_UID_DIGIT_COUNT = 6
 const BROWSER_UID_RANGE = 1_000_000
 
