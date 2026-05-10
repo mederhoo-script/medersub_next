@@ -58,6 +58,7 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
       const reason = error instanceof Error ? error.message : 'Unknown Monetag error'
       throw new Error(`Monetag rewarded interstitial failed: ${reason}`)
     }
+    return
   }
 
   throw new Error(`Monetag rewarded interstitial function ${showFnName} is unavailable. Ensure the script loaded and check network/ad-blocking restrictions.`)
