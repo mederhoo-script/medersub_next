@@ -15,7 +15,7 @@ type RewardProfile = {
   reward_referral_earnings_ngn: number
 }
 
-const MONETAG_ZONE_ID = (process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || MONETAG_DEFAULT_ZONE_ID).trim()
+const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID?.trim() || MONETAG_DEFAULT_ZONE_ID
 const BROWSER_UID_DIGIT_COUNT = 6
 const BROWSER_UID_RANGE = 1_000_000
 
