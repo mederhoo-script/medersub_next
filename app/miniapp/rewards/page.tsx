@@ -73,9 +73,13 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
   const loadScriptIfNeeded = async () => {
     const currentFn = monetagWindow[showFnName]
     if (typeof currentFn === 'function') return
+    const scriptRef = monetagScript
+    if (!scriptRef) {
+      throw new Error('Monetag interstitial script element could not be prepared.')
+    }
 
     await new Promise<void>((resolve, reject) => {
-      const script = monetagScript!
+      const script = scriptRef
       let finished = false
 
       const finish = (callback: () => void) => {
