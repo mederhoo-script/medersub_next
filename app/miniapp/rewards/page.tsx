@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
-import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
+import { BROWSER_REWARD_UID_REGEX, MONETAG_DEFAULT_ZONE_ID, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
 
 type RewardProfile = {
   uid: string
@@ -15,8 +15,7 @@ type RewardProfile = {
   reward_referral_earnings_ngn: number
 }
 
-// Keep the required placeholder as fallback for local/example environments.
-const MONETAG_ZONE_ID = process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || 'MONETAG_ZONE_ID_HERE'
+const MONETAG_ZONE_ID = (process.env.NEXT_PUBLIC_MONETAG_ZONE_ID || MONETAG_DEFAULT_ZONE_ID).trim()
 const BROWSER_UID_DIGIT_COUNT = 6
 const BROWSER_UID_RANGE = 1_000_000
 
@@ -40,6 +39,8 @@ function getOrCreateBrowserUid(): string {
 }
 
 async function triggerMonetagRewardedInterstitial(): Promise<void> {
+  const showFnName = `show_${MONETAG_ZONE_ID}`
+
   if (!document.querySelector(`script[data-monetag-zone="${MONETAG_ZONE_ID}"]`)) {
     const script = document.createElement('script')
     script.async = true
@@ -49,10 +50,13 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, MONETAG_SCRIPT_LOAD_DELAY_MS))
   }
 
-  const adFn = (window as any)[`show_${MONETAG_ZONE_ID}`]
+  const adFn = (window as any)[showFnName]
   if (typeof adFn === 'function') {
     await adFn()
+    return
   }
+
+  throw new Error(`Monetag rewarded interstitial function ${showFnName} is unavailable`)
 }
 
 export default function MiniappRewardsPage() {
@@ -90,12 +94,6 @@ export default function MiniappRewardsPage() {
     ;(async () => {
       try {
         setOrigin(window.location.origin)
-        if (process.env.NODE_ENV === 'production' && MONETAG_ZONE_ID === 'MONETAG_ZONE_ID_HERE') {
-          throw new Error('Monetag zone ID is not configured')
-        }
-        if (process.env.NODE_ENV !== 'production' && MONETAG_ZONE_ID === 'MONETAG_ZONE_ID_HERE') {
-          console.warn('NEXT_PUBLIC_MONETAG_ZONE_ID is not set; using MONETAG_ZONE_ID_HERE placeholder.')
-        }
         const refParam = new URLSearchParams(window.location.search).get('ref') || undefined
         setReferredBy(refParam)
         const tg = (window as any).Telegram?.WebApp
