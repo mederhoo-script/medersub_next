@@ -52,11 +52,16 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
 
   const adFn = (window as any)[showFnName]
   if (typeof adFn === 'function') {
-    await adFn()
+    try {
+      await adFn()
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : 'Unknown Monetag error'
+      throw new Error(`Monetag rewarded interstitial failed: ${reason}`)
+    }
     return
   }
 
-  throw new Error(`Monetag rewarded interstitial function ${showFnName} is unavailable`)
+  throw new Error(`Monetag rewarded interstitial function ${showFnName} is unavailable. Ensure the script loaded and check network/ad-blocking restrictions.`)
 }
 
 export default function MiniappRewardsPage() {
