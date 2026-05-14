@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
 import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
+import Link from 'next/link'
 
 type RewardProfile = {
   uid: string
@@ -351,6 +352,13 @@ export default function MiniappRewardsPage() {
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
               {getWatchButtonText()}
             </button>
+
+            <Link
+              href="/dashboard"
+              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center"
+            >
+              Spend Earnings
+            </Link>
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Gift className="h-4 w-4" /> Referrals</div>
