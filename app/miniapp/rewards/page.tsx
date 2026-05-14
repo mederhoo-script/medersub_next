@@ -161,6 +161,19 @@ export default function MiniappRewardsPage() {
   const [identity, setIdentity] = useState<{ initData?: string; rewardUid?: string; firstName?: string; username?: string }>({})
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
+  const preloadAd = async (ymid: string) => {
+    setAdStatus('loading')
+    await triggerMonetagRewardedInterstitial({ type: 'preload', ymid, requestVar: 'miniapp_rewards_watch' })
+    setAdStatus('ready')
+  }
+
+  const getWatchButtonText = () => {
+    if (adStatus === 'ready') return 'Watch Ad & Earn ₦10'
+    if (adStatus === 'loading') return 'Watch Ad (Loading...)'
+    if (adStatus === 'failed') return 'Watch Ad (Tap to Retry)'
+    return 'Watch Ad & Earn ₦10'
+  }
+
   const fetchProfile = async (payload: { initData?: string; rewardUid?: string; firstName?: string; username?: string; referredBy?: string }) => {
     const res = await fetch('/api/rewards/profile', {
       method: 'POST',
@@ -223,10 +236,9 @@ export default function MiniappRewardsPage() {
     if (loading || !profile || adStatus !== 'idle') return
     let cancelled = false
     const preloadYmid = `${profile.uid}-preload`
-    setAdStatus('loading')
-    triggerMonetagRewardedInterstitial({ type: 'preload', ymid: preloadYmid, requestVar: 'miniapp_rewards_watch' })
+    preloadAd(preloadYmid)
       .then(() => {
-        if (!cancelled) setAdStatus('ready')
+        if (cancelled) setAdStatus('idle')
       })
       .catch((error: unknown) => {
         const reason = error instanceof Error ? error.message : 'Unknown preload error'
@@ -245,14 +257,8 @@ export default function MiniappRewardsPage() {
     setMessage(null)
     try {
       if (adStatus !== 'ready') {
-        setAdStatus('loading')
         try {
-          await triggerMonetagRewardedInterstitial({
-            type: 'preload',
-            ymid: `${profile.uid}-retry-preload-${Date.now()}`,
-            requestVar: 'miniapp_rewards_watch',
-          })
-          setAdStatus('ready')
+          await preloadAd(`${profile.uid}-retry-preload-${Date.now()}`)
         } catch (error: unknown) {
           const reason = error instanceof Error ? error.message : 'Unknown preload error'
           setAdStatus('failed')
@@ -343,13 +349,7 @@ export default function MiniappRewardsPage() {
               className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-              {adStatus === 'ready'
-                ? 'Watch Ad & Earn ₦10'
-                : adStatus === 'loading'
-                  ? 'Watch Ad (Loading...)'
-                  : adStatus === 'failed'
-                    ? 'Watch Ad (Tap to Retry)'
-                    : 'Watch Ad & Earn ₦10'}
+              {getWatchButtonText()}
             </button>
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
