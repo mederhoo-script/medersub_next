@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User, Mail, Phone, Shield } from 'lucide-react';
+import { User, Mail, Shield, Coins } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
@@ -81,6 +81,25 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-3">
+                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Coins className="text-amber-500 h-4 w-4" />
+                        <p className="text-xs text-gray-500">Telegram Earnings</p>
+                    </div>
+                    {profile?.telegram_id ? (
+                        <div className="space-y-1">
+                            <p className="font-medium text-gray-900">
+                                Balance: ₦{Number(profile.reward_balance_ngn || 0).toLocaleString()}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                                Referral Earnings: ₦{Number(profile.reward_referral_earnings_ngn || 0).toLocaleString()}
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-gray-600">Link Telegram to start earning and track your balance.</p>
+                    )}
+                </div>
+
                 {profile?.telegram_id ? (
                     <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
                         <div>
