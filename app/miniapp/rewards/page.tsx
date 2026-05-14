@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
 import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
+import Link from 'next/link'
 
 type RewardProfile = {
   uid: string
@@ -15,7 +16,13 @@ type RewardProfile = {
   reward_referral_earnings_ngn: number
 }
 
-type MonetagAdFn = () => void | Promise<void>
+type MonetagAdOptions = {
+  type?: 'preload'
+  ymid?: string
+  requestVar?: string
+}
+
+type MonetagAdFn = (options?: MonetagAdOptions) => void | Promise<void>
 
 type TelegramWebApp = {
   ready?: () => void
@@ -31,7 +38,8 @@ type TelegramWebApp = {
 const MONETAG_ZONE_ID = '10985896'
 const BROWSER_UID_DIGIT_COUNT = 6
 const BROWSER_UID_RANGE = 1_000_000
-const MONETAG_SCRIPT_SRC = `https://5gvci.com/act/files/tag.min.js?z=${MONETAG_ZONE_ID}`
+const MONETAG_FUNCTION_NAME = `show_${MONETAG_ZONE_ID}`
+const MONETAG_SCRIPT_SRC = 'https://libtl.com/sdk.js'
 const MONETAG_SCRIPT_TIMEOUT_MS = 12_000
 const MONETAG_FUNCTION_WAIT_TIMEOUT_MS = 8_000
 const MONETAG_FUNCTION_WAIT_INTERVAL_MS = 250
@@ -55,9 +63,8 @@ function getOrCreateBrowserUid(): string {
   return generated
 }
 
-async function triggerMonetagRewardedInterstitial(): Promise<void> {
-  const showFnName = `show_${MONETAG_ZONE_ID}`
-  const adFnSelector = `script[data-monetag-zone="${MONETAG_ZONE_ID}"]`
+async function triggerMonetagRewardedInterstitial(options?: MonetagAdOptions): Promise<void> {
+  const adFnSelector = `script[data-monetag-zone="${MONETAG_ZONE_ID}"][data-monetag-sdk="${MONETAG_FUNCTION_NAME}"]`
   const monetagWindow = window as unknown as Window & Record<string, unknown>
 
   let monetagScript = document.querySelector<HTMLScriptElement>(adFnSelector)
@@ -66,12 +73,15 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
     script.async = true
     script.setAttribute('data-cfasync', 'false')
     script.dataset.monetagZone = MONETAG_ZONE_ID
+    script.dataset.monetagSdk = MONETAG_FUNCTION_NAME
+    script.dataset.zone = MONETAG_ZONE_ID
+    script.dataset.sdk = MONETAG_FUNCTION_NAME
     script.src = MONETAG_SCRIPT_SRC
     monetagScript = script
   }
 
   const loadScriptIfNeeded = async () => {
-    const currentFn = monetagWindow[showFnName]
+    const currentFn = monetagWindow[MONETAG_FUNCTION_NAME]
     if (typeof currentFn === 'function') return
     const scriptRef = monetagScript
     if (!scriptRef) {
@@ -108,7 +118,7 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
 
       if (!script.isConnected) {
         document.head.appendChild(script)
-      } else if (typeof monetagWindow[showFnName] === 'function') {
+      } else if (typeof monetagWindow[MONETAG_FUNCTION_NAME] === 'function') {
         finish(resolve)
       }
     })
@@ -118,16 +128,19 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
 
   await loadScriptIfNeeded()
 
-  let adFn = monetagWindow[showFnName]
+  let adFn = monetagWindow[MONETAG_FUNCTION_NAME]
   const startedAt = Date.now()
   while (typeof adFn !== 'function' && Date.now() - startedAt < MONETAG_FUNCTION_WAIT_TIMEOUT_MS) {
     await new Promise(resolve => setTimeout(resolve, MONETAG_FUNCTION_WAIT_INTERVAL_MS))
-    adFn = monetagWindow[showFnName]
+    adFn = monetagWindow[MONETAG_FUNCTION_NAME]
   }
 
   if (typeof adFn === 'function') {
     try {
-      await (adFn as MonetagAdFn)()
+      const adResult = (adFn as MonetagAdFn)(options)
+      if (options?.type !== 'preload') {
+        await adResult
+      }
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : 'Unknown Monetag error'
       throw new Error(`Monetag rewarded interstitial failed: ${reason}`)
@@ -135,7 +148,9 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
     return
   }
 
-  throw new Error(`Monetag rewarded interstitial function ${showFnName} is unavailable. Ensure the script loaded and check network/ad-blocking restrictions.`)
+  throw new Error(
+    `Monetag rewarded interstitial function ${MONETAG_FUNCTION_NAME} is unavailable. Ensure zone ID is the main SDK zone and check network/ad-blocking restrictions.`,
+  )
 }
 
 export default function MiniappRewardsPage() {
@@ -143,11 +158,25 @@ export default function MiniappRewardsPage() {
 
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [adStatus, setAdStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [origin, setOrigin] = useState('')
   const [profile, setProfile] = useState<RewardProfile | null>(null)
   const [identity, setIdentity] = useState<{ initData?: string; rewardUid?: string; firstName?: string; username?: string }>({})
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const preloadAd = async (ymid: string) => {
+    setAdStatus('loading')
+    await triggerMonetagRewardedInterstitial({ type: 'preload', ymid, requestVar: 'miniapp_rewards_watch' })
+    setAdStatus('ready')
+  }
+
+  const getWatchButtonText = () => {
+    if (adStatus === 'ready') return 'Watch Ad & Earn ₦10'
+    if (adStatus === 'loading') return 'Watch Ad (Loading...)'
+    if (adStatus === 'failed') return 'Watch Ad (Tap to Retry)'
+    return 'Watch Ad & Earn ₦10'
+  }
 
   const fetchProfile = async (payload: { initData?: string; rewardUid?: string; firstName?: string; username?: string; referredBy?: string }) => {
     const res = await fetch('/api/rewards/profile', {
@@ -207,12 +236,39 @@ export default function MiniappRewardsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (loading || !profile || adStatus !== 'idle') return
+    let cancelled = false
+    const preloadYmid = `${profile.uid}-preload`
+    preloadAd(preloadYmid)
+      .catch((error: unknown) => {
+        const reason = error instanceof Error ? error.message : 'Unknown preload error'
+        console.warn(`Monetag preload failed: ${reason}`)
+        if (!cancelled) setAdStatus('failed')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [loading, profile, adStatus])
+
   const handleWatchAndEarn = async () => {
     if (!profile) return
     setBusy(true)
     setMessage(null)
     try {
-      await triggerMonetagRewardedInterstitial()
+      if (adStatus !== 'ready') {
+        try {
+          await preloadAd(`${profile.uid}-retry-preload-${Date.now()}`)
+        } catch (error: unknown) {
+          const reason = error instanceof Error ? error.message : 'Unknown preload error'
+          setAdStatus('failed')
+          throw new Error(`Ad preload failed: ${reason}`)
+        }
+      }
+      const rewardYmid = `${profile.uid}-${Date.now()}`
+      await triggerMonetagRewardedInterstitial({ ymid: rewardYmid, requestVar: 'miniapp_rewards_watch' })
+      setAdStatus('idle')
 
       const res = await fetch('/api/rewards/watch', {
         method: 'POST',
@@ -294,8 +350,15 @@ export default function MiniappRewardsPage() {
               className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-              Watch Ad & Earn ₦10
+              {getWatchButtonText()}
             </button>
+
+            <Link
+              href="/dashboard"
+              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center"
+            >
+              Spend Earnings
+            </Link>
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Gift className="h-4 w-4" /> Referrals</div>
