@@ -154,7 +154,7 @@ export default function MiniappRewardsPage() {
 
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [adReady, setAdReady] = useState(false)
+  const [adStatus, setAdStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [origin, setOrigin] = useState('')
   const [profile, setProfile] = useState<RewardProfile | null>(null)
@@ -220,45 +220,48 @@ export default function MiniappRewardsPage() {
   }, [])
 
   useEffect(() => {
-    if (loading || !profile || adReady) return
+    if (loading || !profile || adStatus !== 'idle') return
     let cancelled = false
     const preloadYmid = `${profile.uid}-preload`
+    setAdStatus('loading')
     triggerMonetagRewardedInterstitial({ type: 'preload', ymid: preloadYmid, requestVar: 'miniapp_rewards_watch' })
       .then(() => {
-        if (!cancelled) setAdReady(true)
+        if (!cancelled) setAdStatus('ready')
       })
       .catch((error: unknown) => {
         const reason = error instanceof Error ? error.message : 'Unknown preload error'
         console.warn(`Monetag preload failed: ${reason}`)
-        if (!cancelled) setAdReady(false)
+        if (!cancelled) setAdStatus('failed')
       })
 
     return () => {
       cancelled = true
     }
-  }, [loading, profile, adReady])
+  }, [loading, profile, adStatus])
 
   const handleWatchAndEarn = async () => {
     if (!profile) return
     setBusy(true)
     setMessage(null)
     try {
-      if (!adReady) {
+      if (adStatus !== 'ready') {
+        setAdStatus('loading')
         try {
           await triggerMonetagRewardedInterstitial({
             type: 'preload',
             ymid: `${profile.uid}-retry-preload-${Date.now()}`,
             requestVar: 'miniapp_rewards_watch',
           })
+          setAdStatus('ready')
         } catch (error: unknown) {
           const reason = error instanceof Error ? error.message : 'Unknown preload error'
+          setAdStatus('failed')
           throw new Error(`Ad preload failed: ${reason}`)
         }
-        setAdReady(true)
       }
       const rewardYmid = `${profile.uid}-${Date.now()}`
       await triggerMonetagRewardedInterstitial({ ymid: rewardYmid, requestVar: 'miniapp_rewards_watch' })
-      setAdReady(false)
+      setAdStatus('idle')
 
       const res = await fetch('/api/rewards/watch', {
         method: 'POST',
@@ -340,7 +343,13 @@ export default function MiniappRewardsPage() {
               className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-              {adReady ? 'Watch Ad & Earn ₦10' : 'Watch Ad (Loading...)'}
+              {adStatus === 'ready'
+                ? 'Watch Ad & Earn ₦10'
+                : adStatus === 'loading'
+                  ? 'Watch Ad (Loading...)'
+                  : adStatus === 'failed'
+                    ? 'Watch Ad (Tap to Retry)'
+                    : 'Watch Ad & Earn ₦10'}
             </button>
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
