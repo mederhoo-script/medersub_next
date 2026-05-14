@@ -96,18 +96,17 @@ export default function ProfilePage() {
                         <Coins className="text-amber-500 h-4 w-4" />
                         <p className="text-xs text-gray-500">Telegram Earnings</p>
                     </div>
-                    {profile?.telegram_id ? (
-                        <div className="space-y-1">
-                            <p className="font-medium text-gray-900">
-                                Balance: ₦{Number(profile.reward_balance_ngn || 0).toLocaleString()}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                                Referral Earnings: ₦{Number(profile.reward_referral_earnings_ngn || 0).toLocaleString()}
-                            </p>
-                        </div>
-                    ) : (
-                        <p className="text-sm text-gray-600">Link Telegram to start earning and track your balance.</p>
-                    )}
+                    <div className="space-y-1">
+                        <p className="font-medium text-gray-900">
+                            Balance: ₦{Number(profile.reward_balance_ngn || 0).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                            Referral Earnings: ₦{Number(profile.reward_referral_earnings_ngn || 0).toLocaleString()}
+                        </p>
+                        {!profile?.telegram_id && (
+                            <p className="text-sm text-gray-600">Link Telegram to start earning more.</p>
+                        )}
+                    </div>
                 </div>
 
                 {profile?.telegram_id ? (
