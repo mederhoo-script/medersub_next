@@ -6,8 +6,18 @@ import dynamic from 'next/dynamic';
 
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
 
+interface Profile {
+    id: string;
+    full_name: string | null;
+    role: string | null;
+    telegram_id: string | null;
+    telegram_username: string | null;
+    reward_balance_ngn: number | null;
+    reward_referral_earnings_ngn: number | null;
+}
+
 export default function ProfilePage() {
-    const [profile, setProfile] = useState<any>(null);
+    const [profile, setProfile] = useState<Profile | null>(null);
     const [email, setEmail] = useState<string>('');
 
     useEffect(() => {
