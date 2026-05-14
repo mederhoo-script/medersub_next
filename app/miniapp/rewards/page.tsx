@@ -137,7 +137,10 @@ async function triggerMonetagRewardedInterstitial(options?: MonetagAdOptions): P
 
   if (typeof adFn === 'function') {
     try {
-      await (adFn as MonetagAdFn)(options)
+      const adResult = (adFn as MonetagAdFn)(options)
+      if (options?.type !== 'preload') {
+        await adResult
+      }
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : 'Unknown Monetag error'
       throw new Error(`Monetag rewarded interstitial failed: ${reason}`)
