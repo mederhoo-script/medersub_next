@@ -1,13 +1,23 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User, Mail, Phone, Shield } from 'lucide-react';
+import { User, Mail, Shield, Coins } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
 
+interface Profile {
+    id: string;
+    full_name: string | null;
+    role: string | null;
+    telegram_id: string | null;
+    telegram_username: string | null;
+    reward_balance_ngn: number | null;
+    reward_referral_earnings_ngn: number | null;
+}
+
 export default function ProfilePage() {
-    const [profile, setProfile] = useState<any>(null);
+    const [profile, setProfile] = useState<Profile | null>(null);
     const [email, setEmail] = useState<string>('');
 
     useEffect(() => {
@@ -81,6 +91,24 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-3">
+                <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Coins className="text-amber-500 h-4 w-4" />
+                        <p className="text-xs text-gray-500">Rewards Summary</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="font-medium text-gray-900">
+                            Balance: NGN {(profile.reward_balance_ngn ?? 0).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                            Referral Earnings: NGN {(profile.reward_referral_earnings_ngn ?? 0).toLocaleString()}
+                        </p>
+                        {!profile?.telegram_id && (
+                            <p className="text-sm text-gray-600">Link Telegram to unlock referral rewards and bonus earnings.</p>
+                        )}
+                    </div>
+                </div>
+
                 {profile?.telegram_id ? (
                     <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
                         <div>
