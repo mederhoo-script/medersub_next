@@ -15,9 +15,26 @@ type RewardProfile = {
   reward_referral_earnings_ngn: number
 }
 
+type MonetagAdFn = () => void | Promise<void>
+
+type TelegramWebApp = {
+  ready?: () => void
+  initData?: string
+  initDataUnsafe?: {
+    user?: {
+      first_name?: string
+      username?: string
+    }
+  }
+}
+
 const MONETAG_ZONE_ID = '10985896'
 const BROWSER_UID_DIGIT_COUNT = 6
 const BROWSER_UID_RANGE = 1_000_000
+const MONETAG_SCRIPT_SRC = `https://5gvci.com/act/files/tag.min.js?z=${MONETAG_ZONE_ID}`
+const MONETAG_SCRIPT_TIMEOUT_MS = 12_000
+const MONETAG_FUNCTION_WAIT_TIMEOUT_MS = 8_000
+const MONETAG_FUNCTION_WAIT_INTERVAL_MS = 250
 
 function getOrCreateBrowserUid(): string {
   const key = 'miniapp_reward_uid'
@@ -40,20 +57,77 @@ function getOrCreateBrowserUid(): string {
 
 async function triggerMonetagRewardedInterstitial(): Promise<void> {
   const showFnName = `show_${MONETAG_ZONE_ID}`
+  const adFnSelector = `script[data-monetag-zone="${MONETAG_ZONE_ID}"]`
+  const monetagWindow = window as unknown as Window & Record<string, unknown>
 
-  if (!document.querySelector(`script[data-monetag-zone="${MONETAG_ZONE_ID}"]`)) {
+  let monetagScript = document.querySelector<HTMLScriptElement>(adFnSelector)
+  if (!monetagScript) {
     const script = document.createElement('script')
     script.async = true
+    script.setAttribute('data-cfasync', 'false')
     script.dataset.monetagZone = MONETAG_ZONE_ID
-    script.src = `https://5gvci.com/act/files/tag.min.js?z=${MONETAG_ZONE_ID}`
-    document.head.appendChild(script)
+    script.src = MONETAG_SCRIPT_SRC
+    monetagScript = script
+  }
+
+  const loadScriptIfNeeded = async () => {
+    const currentFn = monetagWindow[showFnName]
+    if (typeof currentFn === 'function') return
+    const scriptRef = monetagScript
+    if (!scriptRef) {
+      throw new Error('Monetag interstitial script element could not be prepared.')
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const script = scriptRef
+      let finished = false
+
+      const finish = (callback: () => void) => {
+        if (finished) return
+        finished = true
+        script.removeEventListener('load', onLoad)
+        script.removeEventListener('error', onError)
+        clearTimeout(timeoutId)
+        callback()
+      }
+
+      const onLoad = () => finish(resolve)
+      const onError = () =>
+        finish(() =>
+          reject(new Error('Failed to load Monetag interstitial script. It may be blocked by network policy or an ad blocker.')),
+        )
+
+      const timeoutId = window.setTimeout(() => {
+        finish(() =>
+          reject(new Error('Timed out while loading Monetag interstitial script. Check network/ad-blocking restrictions.')),
+        )
+      }, MONETAG_SCRIPT_TIMEOUT_MS)
+
+      script.addEventListener('load', onLoad, { once: true })
+      script.addEventListener('error', onError, { once: true })
+
+      if (!script.isConnected) {
+        document.head.appendChild(script)
+      } else if (typeof monetagWindow[showFnName] === 'function') {
+        finish(resolve)
+      }
+    })
+
     await new Promise(resolve => setTimeout(resolve, MONETAG_SCRIPT_LOAD_DELAY_MS))
   }
 
-  const adFn = (window as any)[showFnName]
+  await loadScriptIfNeeded()
+
+  let adFn = monetagWindow[showFnName]
+  const startedAt = Date.now()
+  while (typeof adFn !== 'function' && Date.now() - startedAt < MONETAG_FUNCTION_WAIT_TIMEOUT_MS) {
+    await new Promise(resolve => setTimeout(resolve, MONETAG_FUNCTION_WAIT_INTERVAL_MS))
+    adFn = monetagWindow[showFnName]
+  }
+
   if (typeof adFn === 'function') {
     try {
-      await adFn()
+      await (adFn as MonetagAdFn)()
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : 'Unknown Monetag error'
       throw new Error(`Monetag rewarded interstitial failed: ${reason}`)
@@ -101,7 +175,7 @@ export default function MiniappRewardsPage() {
         setOrigin(window.location.origin)
         const refParam = new URLSearchParams(window.location.search).get('ref') || undefined
         setReferredBy(refParam)
-        const tg = (window as any).Telegram?.WebApp
+        const tg = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp
         if (tg?.ready) tg.ready()
 
         if (tg?.initData) {
