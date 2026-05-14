@@ -104,7 +104,7 @@ export default function ProfilePage() {
                             Referral Earnings: NGN {Number(profile.reward_referral_earnings_ngn || 0).toLocaleString()}
                         </p>
                         {!profile?.telegram_id && (
-                            <p className="text-sm text-gray-600">Link Telegram to start earning more.</p>
+                            <p className="text-sm text-gray-600">Link Telegram to start earning more</p>
                         )}
                     </div>
                 </div>
