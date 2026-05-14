@@ -94,14 +94,14 @@ export default function ProfilePage() {
                 <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
                     <div className="flex items-center gap-2 mb-2">
                         <Coins className="text-amber-500 h-4 w-4" />
-                        <p className="text-xs text-gray-500">Reward Earnings</p>
+                        <p className="text-xs text-gray-500">Rewards Summary</p>
                     </div>
                     <div className="space-y-1">
                         <p className="font-medium text-gray-900">
-                            Balance: NGN {Number(profile.reward_balance_ngn || 0).toLocaleString()}
+                            Balance: NGN {(profile.reward_balance_ngn ?? 0).toLocaleString()}
                         </p>
                         <p className="text-sm text-gray-600">
-                            Referral Earnings: NGN {Number(profile.reward_referral_earnings_ngn || 0).toLocaleString()}
+                            Referral Earnings: NGN {(profile.reward_referral_earnings_ngn ?? 0).toLocaleString()}
                         </p>
                         {!profile?.telegram_id && (
                             <p className="text-sm text-gray-600">Link Telegram to unlock referral rewards and bonus earnings.</p>
