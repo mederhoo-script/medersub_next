@@ -98,10 +98,10 @@ export default function ProfilePage() {
                     </div>
                     <div className="space-y-1">
                         <p className="font-medium text-gray-900">
-                            Balance: ₦{Number(profile.reward_balance_ngn || 0).toLocaleString()}
+                            Balance: NGN {Number(profile.reward_balance_ngn || 0).toLocaleString()}
                         </p>
                         <p className="text-sm text-gray-600">
-                            Referral Earnings: ₦{Number(profile.reward_referral_earnings_ngn || 0).toLocaleString()}
+                            Referral Earnings: NGN {Number(profile.reward_referral_earnings_ngn || 0).toLocaleString()}
                         </p>
                         {!profile?.telegram_id && (
                             <p className="text-sm text-gray-600">Link Telegram to start earning more.</p>
