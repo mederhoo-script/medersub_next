@@ -15,7 +15,13 @@ type RewardProfile = {
   reward_referral_earnings_ngn: number
 }
 
-type MonetagAdFn = () => void | Promise<void>
+type MonetagAdOptions = {
+  type?: 'preload'
+  ymid?: string
+  requestVar?: string
+}
+
+type MonetagAdFn = (options?: MonetagAdOptions) => void | Promise<void>
 
 type TelegramWebApp = {
   ready?: () => void
@@ -31,7 +37,8 @@ type TelegramWebApp = {
 const MONETAG_ZONE_ID = '10985896'
 const BROWSER_UID_DIGIT_COUNT = 6
 const BROWSER_UID_RANGE = 1_000_000
-const MONETAG_SCRIPT_SRC = `https://5gvci.com/act/files/tag.min.js?z=${MONETAG_ZONE_ID}`
+const MONETAG_FUNCTION_NAME = `show_${MONETAG_ZONE_ID}`
+const MONETAG_SCRIPT_SRC = 'https://libtl.com/sdk.js'
 const MONETAG_SCRIPT_TIMEOUT_MS = 12_000
 const MONETAG_FUNCTION_WAIT_TIMEOUT_MS = 8_000
 const MONETAG_FUNCTION_WAIT_INTERVAL_MS = 250
@@ -55,9 +62,8 @@ function getOrCreateBrowserUid(): string {
   return generated
 }
 
-async function triggerMonetagRewardedInterstitial(): Promise<void> {
-  const showFnName = `show_${MONETAG_ZONE_ID}`
-  const adFnSelector = `script[data-monetag-zone="${MONETAG_ZONE_ID}"]`
+async function triggerMonetagRewardedInterstitial(options?: MonetagAdOptions): Promise<void> {
+  const adFnSelector = `script[data-monetag-zone="${MONETAG_ZONE_ID}"][data-monetag-sdk="${MONETAG_FUNCTION_NAME}"]`
   const monetagWindow = window as unknown as Window & Record<string, unknown>
 
   let monetagScript = document.querySelector<HTMLScriptElement>(adFnSelector)
@@ -66,12 +72,15 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
     script.async = true
     script.setAttribute('data-cfasync', 'false')
     script.dataset.monetagZone = MONETAG_ZONE_ID
+    script.dataset.monetagSdk = MONETAG_FUNCTION_NAME
+    script.dataset.zone = MONETAG_ZONE_ID
+    script.dataset.sdk = MONETAG_FUNCTION_NAME
     script.src = MONETAG_SCRIPT_SRC
     monetagScript = script
   }
 
   const loadScriptIfNeeded = async () => {
-    const currentFn = monetagWindow[showFnName]
+    const currentFn = monetagWindow[MONETAG_FUNCTION_NAME]
     if (typeof currentFn === 'function') return
     const scriptRef = monetagScript
     if (!scriptRef) {
@@ -108,7 +117,7 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
 
       if (!script.isConnected) {
         document.head.appendChild(script)
-      } else if (typeof monetagWindow[showFnName] === 'function') {
+      } else if (typeof monetagWindow[MONETAG_FUNCTION_NAME] === 'function') {
         finish(resolve)
       }
     })
@@ -118,16 +127,16 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
 
   await loadScriptIfNeeded()
 
-  let adFn = monetagWindow[showFnName]
+  let adFn = monetagWindow[MONETAG_FUNCTION_NAME]
   const startedAt = Date.now()
   while (typeof adFn !== 'function' && Date.now() - startedAt < MONETAG_FUNCTION_WAIT_TIMEOUT_MS) {
     await new Promise(resolve => setTimeout(resolve, MONETAG_FUNCTION_WAIT_INTERVAL_MS))
-    adFn = monetagWindow[showFnName]
+    adFn = monetagWindow[MONETAG_FUNCTION_NAME]
   }
 
   if (typeof adFn === 'function') {
     try {
-      await (adFn as MonetagAdFn)()
+      await (adFn as MonetagAdFn)(options)
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : 'Unknown Monetag error'
       throw new Error(`Monetag rewarded interstitial failed: ${reason}`)
@@ -135,7 +144,9 @@ async function triggerMonetagRewardedInterstitial(): Promise<void> {
     return
   }
 
-  throw new Error(`Monetag rewarded interstitial function ${showFnName} is unavailable. Ensure the script loaded and check network/ad-blocking restrictions.`)
+  throw new Error(
+    `Monetag rewarded interstitial function ${MONETAG_FUNCTION_NAME} is unavailable. Ensure zone ID is the main SDK zone and check network/ad-blocking restrictions.`,
+  )
 }
 
 export default function MiniappRewardsPage() {
@@ -143,6 +154,7 @@ export default function MiniappRewardsPage() {
 
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [adReady, setAdReady] = useState(false)
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [origin, setOrigin] = useState('')
   const [profile, setProfile] = useState<RewardProfile | null>(null)
@@ -207,12 +219,39 @@ export default function MiniappRewardsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    if (loading || !profile || adReady) return
+    let cancelled = false
+    const preloadYmid = `${profile.uid}-preload`
+    triggerMonetagRewardedInterstitial({ type: 'preload', ymid: preloadYmid, requestVar: 'miniapp_rewards_watch' })
+      .then(() => {
+        if (!cancelled) setAdReady(true)
+      })
+      .catch(() => {
+        if (!cancelled) setAdReady(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [loading, profile, adReady])
+
   const handleWatchAndEarn = async () => {
     if (!profile) return
     setBusy(true)
     setMessage(null)
     try {
-      await triggerMonetagRewardedInterstitial()
+      if (!adReady) {
+        await triggerMonetagRewardedInterstitial({
+          type: 'preload',
+          ymid: `${profile.uid}-retry-preload-${Date.now()}`,
+          requestVar: 'miniapp_rewards_watch',
+        })
+        setAdReady(true)
+      }
+      const rewardYmid = `${profile.uid}-${Date.now()}`
+      await triggerMonetagRewardedInterstitial({ ymid: rewardYmid, requestVar: 'miniapp_rewards_watch' })
+      setAdReady(false)
 
       const res = await fetch('/api/rewards/watch', {
         method: 'POST',
@@ -294,7 +333,7 @@ export default function MiniappRewardsPage() {
               className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-              Watch Ad & Earn ₦10
+              {adReady ? 'Watch Ad & Earn ₦10' : 'Watch Ad (Preparing...)'}
             </button>
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
