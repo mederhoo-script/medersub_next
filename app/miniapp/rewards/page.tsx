@@ -227,7 +227,9 @@ export default function MiniappRewardsPage() {
       .then(() => {
         if (!cancelled) setAdReady(true)
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        const reason = error instanceof Error ? error.message : 'Unknown preload error'
+        console.warn(`Monetag preload failed: ${reason}`)
         if (!cancelled) setAdReady(false)
       })
 
@@ -242,11 +244,16 @@ export default function MiniappRewardsPage() {
     setMessage(null)
     try {
       if (!adReady) {
-        await triggerMonetagRewardedInterstitial({
-          type: 'preload',
-          ymid: `${profile.uid}-retry-preload-${Date.now()}`,
-          requestVar: 'miniapp_rewards_watch',
-        })
+        try {
+          await triggerMonetagRewardedInterstitial({
+            type: 'preload',
+            ymid: `${profile.uid}-retry-preload-${Date.now()}`,
+            requestVar: 'miniapp_rewards_watch',
+          })
+        } catch (error: unknown) {
+          const reason = error instanceof Error ? error.message : 'Unknown preload error'
+          throw new Error(`Ad preload failed: ${reason}`)
+        }
         setAdReady(true)
       }
       const rewardYmid = `${profile.uid}-${Date.now()}`
@@ -333,7 +340,7 @@ export default function MiniappRewardsPage() {
               className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-              {adReady ? 'Watch Ad & Earn ₦10' : 'Watch Ad (Preparing...)'}
+              {adReady ? 'Watch Ad & Earn ₦10' : 'Watch Ad (Loading...)'}
             </button>
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
