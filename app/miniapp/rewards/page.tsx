@@ -241,9 +241,6 @@ export default function MiniappRewardsPage() {
     let cancelled = false
     const preloadYmid = `${profile.uid}-preload`
     preloadAd(preloadYmid)
-      .then(() => {
-        if (cancelled) setAdStatus('idle')
-      })
       .catch((error: unknown) => {
         const reason = error instanceof Error ? error.message : 'Unknown preload error'
         console.warn(`Monetag preload failed: ${reason}`)
