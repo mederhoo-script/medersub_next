@@ -175,7 +175,7 @@ export async function resolveRewardUser(identity: RewardIdentityInput): Promise<
       .maybeSingle()
   }
 
-  let { data: profile } = await existingProfileQuery
+  const { data: profile } = await existingProfileQuery
 
   let userId = profile?.id as string | undefined
   if (!userId) {

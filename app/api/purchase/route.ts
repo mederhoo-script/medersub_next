@@ -5,6 +5,8 @@ import { inlomax } from '@/lib/inlomax';
 import { calculateDataProfit } from '@/utils/pricing';
 import { getRewardSpendEligibility } from '@/lib/rewards';
 
+type SystemSettingRow = { key: string; value: unknown };
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -24,12 +26,12 @@ export async function POST(req: Request) {
 
         // 0. Check for Maintenance Mode & Markup
         const { data: settings } = await supabaseAdmin.from('system_settings').select('*');
-        const config = settings?.reduce((acc: any, curr: any) => {
+        const config = (settings as SystemSettingRow[] | null)?.reduce<Record<string, unknown>>((acc, curr) => {
             acc[curr.key] = curr.value;
             return acc;
         }, {}) || {};
 
-        const generalConfig = config.general || {};
+        const generalConfig = (config.general as { maintenance?: boolean; markup?: number | string } | undefined) || {};
 
         if (generalConfig.maintenance) {
             return NextResponse.json({ error: 'System is currently under maintenance. Please try again later.' }, { status: 503 });
@@ -214,8 +216,9 @@ export async function POST(req: Request) {
             ...(serviceType === 'EDUCATION' && apiResponse.data?.pins ? { pins: apiResponse.data.pins } : {})
         });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Internal Server Error';
         console.error('Purchase API Exception:', err);
-        return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
