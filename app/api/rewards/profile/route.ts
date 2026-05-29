@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { applyReferralIfEligible, resolveRewardUser } from '@/lib/rewards'
+import { applyReferralIfEligible, getRewardSpendEligibility, resolveRewardUser } from '@/lib/rewards'
 
 export async function POST(req: Request) {
   try {
@@ -19,6 +19,11 @@ export async function POST(req: Request) {
       firstName: body?.firstName,
       username: body?.username,
     })
+    const rewardSpendEligibility = getRewardSpendEligibility({
+      telegramId: refreshed.telegramId,
+      rewardAdsWatched: refreshed.rewardAdsWatched,
+      rewardReferralsCount: refreshed.rewardReferralsCount,
+    })
 
     return NextResponse.json({
       ok: true,
@@ -31,6 +36,7 @@ export async function POST(req: Request) {
         reward_referred_by: refreshed.rewardReferredBy,
         reward_referrals_count: refreshed.rewardReferralsCount,
         reward_referral_earnings_ngn: refreshed.rewardReferralEarningsNgn,
+        reward_spend_stage: rewardSpendEligibility,
       },
     })
   } catch (err: unknown) {

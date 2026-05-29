@@ -5,6 +5,7 @@ import { Wifi, Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
+import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
 
 // Static Network Defs (Inlomax usually returns these or we map them)
 const NETWORKS = [
@@ -24,7 +25,7 @@ export default function DataPage() {
     const [loadingPlans, setLoadingPlans] = useState(true);
     const [plan, setPlan] = useState<any>(null);
     const [phone, setPhone] = useState('');
-    const [paymentSource, setPaymentSource] = useState<'wallet' | 'reward'>('wallet');
+    const { paymentSource, setPaymentSource } = useDefaultPaymentSource();
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
     const [allDataPlans, setAllDataPlans] = useState<any[]>([]);

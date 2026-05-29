@@ -5,6 +5,7 @@ import { Tv, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
+import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
 
 // Provider Data based on user inputs/standard IDs
 const PROVIDERS = [
@@ -23,7 +24,7 @@ export default function CablePage() {
     const [validating, setValidating] = useState(false);
     const [customerName, setCustomerName] = useState<string | null>(null);
     const [selectedPlan, setSelectedPlan] = useState<any>(null);
-    const [paymentSource, setPaymentSource] = useState<'wallet' | 'reward'>('wallet');
+    const { paymentSource, setPaymentSource } = useDefaultPaymentSource();
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
 

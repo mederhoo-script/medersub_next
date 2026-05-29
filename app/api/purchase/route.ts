@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { inlomax } from '@/lib/inlomax';
 import { calculateDataProfit } from '@/utils/pricing';
+import { getRewardSpendEligibility } from '@/lib/rewards';
 
 export async function POST(req: Request) {
     try {
@@ -78,12 +79,25 @@ export async function POST(req: Request) {
         if (selectedPaymentSource === 'reward') {
             const { data: profile, error: profileError } = await supabaseAdmin
                 .from('profiles')
-                .select('reward_balance_ngn')
+                .select('reward_balance_ngn,telegram_id,reward_ads_watched,reward_referrals_count')
                 .eq('id', userId)
                 .single();
 
             if (profileError || !profile) {
                 return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
+            }
+
+            const rewardSpendEligibility = getRewardSpendEligibility({
+                telegramId: (profile.telegram_id as string) || null,
+                rewardAdsWatched: Number(profile.reward_ads_watched || 0),
+                rewardReferralsCount: Number(profile.reward_referrals_count || 0),
+            });
+
+            if (!rewardSpendEligibility.canSpendRewards) {
+                return NextResponse.json({
+                    error: `Telegram reward spend locked. Watch ${rewardSpendEligibility.requiredAdsWatched} ads and refer ${rewardSpendEligibility.requiredReferrals} users first.`,
+                    stage: rewardSpendEligibility,
+                }, { status: 400 });
             }
 
             currentBalance = Number(profile.reward_balance_ngn || 0);
