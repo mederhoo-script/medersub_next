@@ -111,7 +111,7 @@ export default function SpendingBalances({ paymentSource }: { paymentSource?: Pa
                 <span className="text-gray-600">Reward Balance</span>
                 <span className="font-semibold text-gray-900">{formatAmount(rewardBalance)}</span>
             </div>
-            {loadingBalances && <p className="text-xs text-gray-500">Fetching balances...</p>}
+            {loadingBalances && <p role="status" aria-live="polite" className="text-xs text-gray-500">Fetching balances...</p>}
             {loadError && <p className="text-xs text-red-600">{loadError}</p>}
             {paymentSource && (
                 <p className="text-xs text-blue-600">

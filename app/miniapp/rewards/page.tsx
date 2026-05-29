@@ -189,6 +189,22 @@ export default function MiniappRewardsPage() {
     return 'Watch Ad & Earn ₦10'
   }
 
+  const getSpendLockText = (stage: NonNullable<RewardProfile['reward_spend_stage']>) => {
+    const requirements = [
+      stage.remainingAdsToWatch > 0
+        ? `watch at least ${stage.remainingAdsToWatch} more ${stage.remainingAdsToWatch === 1 ? 'ad' : 'ads'}`
+        : '',
+      stage.remainingReferrals > 0
+        ? `refer ${stage.remainingReferrals} more ${stage.remainingReferrals === 1 ? 'user' : 'users'}`
+        : '',
+    ].filter(Boolean)
+
+    if (requirements.length === 0) return ''
+
+    const sentence = requirements.join(' and ')
+    return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)} to spend rewards.`
+  }
+
   const fetchProfile = async (payload: { initData?: string; rewardUid?: string; firstName?: string; username?: string; referredBy?: string }) => {
     const res = await fetch('/api/rewards/profile', {
       method: 'POST',
@@ -254,8 +270,14 @@ export default function MiniappRewardsPage() {
       return
     }
 
+    const parsedNextAdAt = new Date(nextAdAt).getTime()
+    if (!Number.isFinite(parsedNextAdAt)) {
+      setCooldownSeconds(0)
+      return
+    }
+
     const updateCooldown = () => {
-      const remaining = Math.ceil((new Date(nextAdAt).getTime() - Date.now()) / 1000)
+      const remaining = Math.ceil((parsedNextAdAt - Date.now()) / 1000)
       setCooldownSeconds(Math.max(0, remaining))
     }
 
@@ -396,7 +418,9 @@ export default function MiniappRewardsPage() {
                   Referral progress: {profile.reward_spend_stage.requiredReferrals - profile.reward_spend_stage.remainingReferrals}/{profile.reward_spend_stage.requiredReferrals}
                 </p>
                 {!profile.reward_spend_stage.canSpendRewards && (
-                  <p className="text-xs text-amber-700">Watch at least {profile.reward_spend_stage.remainingAdsToWatch} more ads and refer {profile.reward_spend_stage.remainingReferrals} more users to spend rewards.</p>
+                  <p className="text-xs text-amber-700">
+                    {getSpendLockText(profile.reward_spend_stage)}
+                  </p>
                 )}
               </div>
             )}

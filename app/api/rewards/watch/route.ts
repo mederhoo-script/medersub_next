@@ -26,8 +26,9 @@ export async function POST(req: Request) {
       .limit(1)
       .maybeSingle()
 
-    const lastAdAt = latestAdReward?.created_at ? new Date(latestAdReward.created_at as string).getTime() : 0
-    if (lastAdAt) {
+    const hasLastAdReward = typeof latestAdReward?.created_at === 'string'
+    const lastAdAt = hasLastAdReward ? new Date(latestAdReward.created_at as string).getTime() : 0
+    if (hasLastAdReward) {
       const nextAllowedAtMs = lastAdAt + AD_COOLDOWN_SECONDS * 1000
       const remainingMs = nextAllowedAtMs - Date.now()
       if (remainingMs > 0) {

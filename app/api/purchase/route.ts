@@ -96,8 +96,19 @@ export async function POST(req: Request) {
             });
 
             if (!rewardSpendEligibility.canSpendRewards) {
+                const remainingRequirements = [
+                    rewardSpendEligibility.remainingAdsToWatch > 0
+                        ? `watch ${rewardSpendEligibility.remainingAdsToWatch} more ${rewardSpendEligibility.remainingAdsToWatch === 1 ? 'ad' : 'ads'}`
+                        : '',
+                    rewardSpendEligibility.remainingReferrals > 0
+                        ? `refer ${rewardSpendEligibility.remainingReferrals} more ${rewardSpendEligibility.remainingReferrals === 1 ? 'user' : 'users'}`
+                        : '',
+                ].filter(Boolean);
+                const requirementMessage = remainingRequirements.length > 0
+                    ? `${remainingRequirements.join(' and ')} first.`
+                    : 'Complete your Telegram reward stage requirements first.';
                 return NextResponse.json({
-                    error: `Telegram reward spend locked. Watch ${rewardSpendEligibility.requiredAdsWatched} ads and refer ${rewardSpendEligibility.requiredReferrals} users first.`,
+                    error: `Telegram reward spend locked. ${requirementMessage}`,
                     stage: rewardSpendEligibility,
                 }, { status: 400 });
             }
