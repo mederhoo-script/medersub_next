@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { GraduationCap, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import SpendingBalances from '@/components/dashboard/spending-balances';
 
 interface EducationService {
     serviceID: string;
@@ -178,10 +179,11 @@ export default function EducationPage() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Payment Source</label>
+                        <SpendingBalances paymentSource={paymentSource} />
                         <select
                             value={paymentSource}
                             onChange={(e) => setPaymentSource(e.target.value as 'wallet' | 'reward')}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                            className="w-full mt-2 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                         >
                             <option value="wallet">Main Wallet</option>
                             <option value="reward">Reward Balance</option>

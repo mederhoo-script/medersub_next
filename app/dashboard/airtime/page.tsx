@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { Smartphone, Loader2, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import SpendingBalances from '@/components/dashboard/spending-balances';
 
 const NETWORKS = [
     { id: 'MTN', name: 'MTN', color: 'bg-yellow-400', serviceId: '1' },
@@ -166,10 +167,11 @@ export default function AirtimePage() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Payment Source</label>
+                        <SpendingBalances paymentSource={paymentSource} />
                         <select
                             value={paymentSource}
                             onChange={(e) => setPaymentSource(e.target.value as 'wallet' | 'reward')}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                            className="w-full mt-2 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                         >
                             <option value="wallet">Main Wallet</option>
                             <option value="reward">Reward Balance</option>

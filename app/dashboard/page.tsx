@@ -40,8 +40,9 @@ export default function DashboardPage() {
                 console.log('[Dashboard] Profile:', data, 'Error:', profileError);
 
                 if (data) {
-                    const balance = data.wallets?.[0]?.balance || 0;
-                    setProfile({ ...data, balance });
+                    const mainBalance = Number(data.wallets?.[0]?.balance || 0);
+                    const rewardBalance = Number(data.reward_balance_ngn || 0);
+                    setProfile({ ...data, mainBalance, rewardBalance });
                 }
             }
         };
@@ -118,7 +119,10 @@ export default function DashboardPage() {
             </div>
 
             {/* Wallet Card */}
-            <WalletCard balance={profile?.balance || 0} />
+            <WalletCard
+                mainBalance={profile?.mainBalance || 0}
+                rewardBalance={profile?.rewardBalance || 0}
+            />
 
             {/* Services */}
             <ServiceGrid />
