@@ -1,40 +1,16 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff, Plus, Send } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 
-export default function WalletCard({ balance: initialBalance }: { balance?: number } = {}) {
+export default function WalletCard({
+    mainBalance = 0,
+    rewardBalance = 0
+}: {
+    mainBalance?: number;
+    rewardBalance?: number;
+} = {}) {
     const [visible, setVisible] = useState(true);
-    const [balance, setBalance] = useState(initialBalance || 0);
-
-    useEffect(() => {
-        if (initialBalance !== undefined) {
-            setBalance(initialBalance);
-        }
-    }, [initialBalance]);
-
-    useEffect(() => {
-        const fetchBalance = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                // Fetch from wallets table
-                const { data: wallet } = await supabase
-                    .from('wallets')
-                    .select('balance')
-                    .eq('user_id', user.id)
-                    .maybeSingle();
-
-                if (wallet) {
-                    setBalance(wallet.balance || 0);
-                }
-            }
-        };
-
-        fetchBalance();
-
-        // Optional: Subscribe to changes if Realtime is enabled
-    }, []);
 
     return (
         <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-lg shadow-blue-200 mb-8 relative overflow-hidden">
@@ -45,11 +21,22 @@ export default function WalletCard({ balance: initialBalance }: { balance?: numb
             <div className="relative z-10">
                 <div className="flex justify-between items-start mb-4">
                     <div>
-                        <p className="text-blue-100 text-sm font-medium mb-1">Total Balance</p>
+                        <p className="text-blue-100 text-sm font-medium mb-1">Balances</p>
                         <div className="flex items-center gap-3">
-                            <h2 className="text-3xl font-bold tracking-tight">
-                                {visible ? `₦${balance.toLocaleString()}` : '••••••••'}
-                            </h2>
+                            <div className="space-y-1">
+                                <p className="text-sm text-blue-100">
+                                    Main Wallet:{' '}
+                                    <span className="font-bold text-white">
+                                        {visible ? `₦${mainBalance.toLocaleString()}` : '••••••••'}
+                                    </span>
+                                </p>
+                                <p className="text-sm text-blue-100">
+                                    Reward Balance:{' '}
+                                    <span className="font-bold text-white">
+                                        {visible ? `₦${rewardBalance.toLocaleString()}` : '••••••••'}
+                                    </span>
+                                </p>
+                            </div>
                             <button
                                 onClick={() => setVisible(!visible)}
                                 className="p-1.5 hover:bg-blue-500/30 rounded-full transition-colors"
