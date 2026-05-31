@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { inlomax } from '@/lib/inlomax';
 import { calculateDataProfit } from '@/utils/pricing';
+import { getRewardSpendEligibility } from '@/lib/rewards';
+
+type SystemSettingRow = { key: string; value: unknown };
 
 export async function POST(req: Request) {
     try {
@@ -23,12 +26,12 @@ export async function POST(req: Request) {
 
         // 0. Check for Maintenance Mode & Markup
         const { data: settings } = await supabaseAdmin.from('system_settings').select('*');
-        const config = settings?.reduce((acc: any, curr: any) => {
+        const config = (settings as SystemSettingRow[] | null)?.reduce<Record<string, unknown>>((acc, curr) => {
             acc[curr.key] = curr.value;
             return acc;
         }, {}) || {};
 
-        const generalConfig = config.general || {};
+        const generalConfig = (config.general as { maintenance?: boolean; markup?: number | string } | undefined) || {};
 
         if (generalConfig.maintenance) {
             return NextResponse.json({ error: 'System is currently under maintenance. Please try again later.' }, { status: 503 });
@@ -78,12 +81,36 @@ export async function POST(req: Request) {
         if (selectedPaymentSource === 'reward') {
             const { data: profile, error: profileError } = await supabaseAdmin
                 .from('profiles')
-                .select('reward_balance_ngn')
+                .select('reward_balance_ngn,telegram_id,reward_ads_watched,reward_referrals_count')
                 .eq('id', userId)
                 .single();
 
             if (profileError || !profile) {
                 return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
+            }
+
+            const rewardSpendEligibility = getRewardSpendEligibility({
+                telegramId: (profile.telegram_id as string) || null,
+                rewardAdsWatched: Number(profile.reward_ads_watched || 0),
+                rewardReferralsCount: Number(profile.reward_referrals_count || 0),
+            });
+
+            if (!rewardSpendEligibility.canSpendRewards) {
+                const remainingRequirements = [
+                    rewardSpendEligibility.remainingAdsToWatch > 0
+                        ? `watch ${rewardSpendEligibility.remainingAdsToWatch} more ${rewardSpendEligibility.remainingAdsToWatch === 1 ? 'ad' : 'ads'}`
+                        : '',
+                    rewardSpendEligibility.remainingReferrals > 0
+                        ? `refer ${rewardSpendEligibility.remainingReferrals} more ${rewardSpendEligibility.remainingReferrals === 1 ? 'user' : 'users'}`
+                        : '',
+                ].filter(Boolean);
+                const requirementMessage = remainingRequirements.length > 0
+                    ? `${remainingRequirements.join(' and ')} first.`
+                    : 'Complete your Telegram reward stage requirements first.';
+                return NextResponse.json({
+                    error: `Telegram reward spend locked. ${requirementMessage}`,
+                    stage: rewardSpendEligibility,
+                }, { status: 400 });
             }
 
             currentBalance = Number(profile.reward_balance_ngn || 0);
@@ -200,8 +227,9 @@ export async function POST(req: Request) {
             ...(serviceType === 'EDUCATION' && apiResponse.data?.pins ? { pins: apiResponse.data.pins } : {})
         });
 
-    } catch (err: any) {
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Internal Server Error';
         console.error('Purchase API Exception:', err);
-        return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

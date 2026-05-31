@@ -14,6 +14,14 @@ type RewardProfile = {
   reward_referred_by: string | null
   reward_referrals_count: number
   reward_referral_earnings_ngn: number
+  reward_spend_stage?: {
+    isTelegramUser: boolean
+    canSpendRewards: boolean
+    requiredAdsWatched: number
+    requiredReferrals: number
+    remainingAdsToWatch: number
+    remainingReferrals: number
+  }
 }
 
 type MonetagAdOptions = {
@@ -162,6 +170,8 @@ export default function MiniappRewardsPage() {
   const [withdrawAmount, setWithdrawAmount] = useState('')
   const [origin, setOrigin] = useState('')
   const [profile, setProfile] = useState<RewardProfile | null>(null)
+  const [nextAdAt, setNextAdAt] = useState<string | null>(null)
+  const [cooldownSeconds, setCooldownSeconds] = useState(0)
   const [identity, setIdentity] = useState<{ initData?: string; rewardUid?: string; firstName?: string; username?: string }>({})
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -172,10 +182,27 @@ export default function MiniappRewardsPage() {
   }
 
   const getWatchButtonText = () => {
+    if (cooldownSeconds > 0) return `Watch Ad in ${cooldownSeconds}s`
     if (adStatus === 'ready') return 'Watch Ad & Earn ₦10'
     if (adStatus === 'loading') return 'Watch Ad (Loading...)'
     if (adStatus === 'failed') return 'Watch Ad (Tap to Retry)'
     return 'Watch Ad & Earn ₦10'
+  }
+
+  const getSpendLockText = (stage: NonNullable<RewardProfile['reward_spend_stage']>) => {
+    const requirements = [
+      stage.remainingAdsToWatch > 0
+        ? `watch at least ${stage.remainingAdsToWatch} more ${stage.remainingAdsToWatch === 1 ? 'ad' : 'ads'}`
+        : '',
+      stage.remainingReferrals > 0
+        ? `refer ${stage.remainingReferrals} more ${stage.remainingReferrals === 1 ? 'user' : 'users'}`
+        : '',
+    ].filter(Boolean)
+
+    if (requirements.length === 0) return ''
+
+    const sentence = requirements.join(' and ')
+    return `${sentence.charAt(0).toUpperCase()}${sentence.slice(1)} to spend rewards.`
   }
 
   const fetchProfile = async (payload: { initData?: string; rewardUid?: string; firstName?: string; username?: string; referredBy?: string }) => {
@@ -187,6 +214,7 @@ export default function MiniappRewardsPage() {
     const data = await res.json()
     if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to load rewards')
     setProfile(data.user as RewardProfile)
+    setNextAdAt(typeof data.next_ad_at === 'string' ? data.next_ad_at : null)
   }
 
   const loadProfile = async (overrides?: { initData?: string; rewardUid?: string; firstName?: string; username?: string }) => {
@@ -237,6 +265,28 @@ export default function MiniappRewardsPage() {
   }, [])
 
   useEffect(() => {
+    if (!nextAdAt) {
+      setCooldownSeconds(0)
+      return
+    }
+
+    const parsedNextAdAt = new Date(nextAdAt).getTime()
+    if (!Number.isFinite(parsedNextAdAt)) {
+      setCooldownSeconds(0)
+      return
+    }
+
+    const updateCooldown = () => {
+      const remaining = Math.ceil((parsedNextAdAt - Date.now()) / 1000)
+      setCooldownSeconds(Math.max(0, remaining))
+    }
+
+    updateCooldown()
+    const timer = window.setInterval(updateCooldown, 1000)
+    return () => window.clearInterval(timer)
+  }, [nextAdAt])
+
+  useEffect(() => {
     if (loading || !profile || adStatus !== 'idle') return
     let cancelled = false
     const preloadYmid = `${profile.uid}-preload`
@@ -254,6 +304,10 @@ export default function MiniappRewardsPage() {
 
   const handleWatchAndEarn = async () => {
     if (!profile) return
+    if (cooldownSeconds > 0) {
+      setMessage({ type: 'error', text: `Please wait ${cooldownSeconds} seconds before watching the next ad.` })
+      return
+    }
     setBusy(true)
     setMessage(null)
     try {
@@ -277,6 +331,7 @@ export default function MiniappRewardsPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to claim reward')
+      if (typeof data.next_ad_at === 'string') setNextAdAt(data.next_ad_at)
 
       await loadProfile()
       setMessage({ type: 'success', text: `You earned ₦${Number(data.earned_ngn || 0).toLocaleString()}!` })
@@ -346,19 +401,46 @@ export default function MiniappRewardsPage() {
 
             <button
               onClick={handleWatchAndEarn}
-              disabled={busy}
+              disabled={busy || cooldownSeconds > 0}
               className="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
               {getWatchButtonText()}
             </button>
 
-            <Link
-              href="/dashboard"
-              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center"
-            >
-              Spend Earnings
-            </Link>
+            {profile.reward_spend_stage?.isTelegramUser && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-1">
+                <p className="text-sm font-semibold text-gray-900">Telegram Reward Spend Stage</p>
+                <p className="text-sm text-gray-600">
+                  Ads progress: {profile.reward_spend_stage.requiredAdsWatched - profile.reward_spend_stage.remainingAdsToWatch}/{profile.reward_spend_stage.requiredAdsWatched}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Referral progress: {profile.reward_spend_stage.requiredReferrals - profile.reward_spend_stage.remainingReferrals}/{profile.reward_spend_stage.requiredReferrals}
+                </p>
+                {!profile.reward_spend_stage.canSpendRewards && (
+                  <p className="text-xs text-amber-700">
+                    {getSpendLockText(profile.reward_spend_stage)}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {profile.reward_spend_stage?.canSpendRewards ?? true ? (
+              <Link
+                href="/dashboard"
+                className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center"
+              >
+                Spend Earnings
+              </Link>
+            ) : (
+              <button
+                type="button"
+                disabled
+                className="w-full py-3 rounded-xl bg-gray-300 text-gray-600 font-semibold flex items-center justify-center"
+              >
+                Spend Earnings (Locked)
+              </button>
+            )}
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-gray-900"><Gift className="h-4 w-4" /> Referrals</div>

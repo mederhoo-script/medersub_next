@@ -5,6 +5,7 @@ import { Zap, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
+import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
 
 // Static fallbacks just in case, or initial state structure
 // Real app fetches from /api/services
@@ -22,7 +23,7 @@ export default function ElectricityPage() {
     const [meterType, setMeterType] = useState(METER_TYPES[0]);
     const [meterNum, setMeterNum] = useState('');
     const [amount, setAmount] = useState('');
-    const [paymentSource, setPaymentSource] = useState<'wallet' | 'reward'>('wallet');
+    const { paymentSource, setPaymentSource } = useDefaultPaymentSource();
 
     const [validating, setValidating] = useState(false);
     const [customerName, setCustomerName] = useState<string | null>(null);

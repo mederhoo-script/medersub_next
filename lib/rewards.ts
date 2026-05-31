@@ -6,6 +6,8 @@ const DEFAULT_TELEGRAM_EMAIL_DOMAIN = 'medersub.local'
 const TELEGRAM_EMAIL_DOMAIN = process.env.TELEGRAM_EMAIL_DOMAIN ?? DEFAULT_TELEGRAM_EMAIL_DOMAIN
 const parsedReferralBonus = Number(process.env.REWARD_REFERRAL_BONUS_NGN ?? 5)
 const REFERRAL_BONUS_NGN = Number.isNaN(parsedReferralBonus) ? 5 : parsedReferralBonus
+export const TELEGRAM_REWARD_SPEND_MIN_ADS = 10
+export const TELEGRAM_REWARD_SPEND_MIN_REFERRALS = 3
 
 function verifyTelegramInitData(initData: string, botToken: string): boolean {
   const params = new URLSearchParams(initData)
@@ -83,6 +85,35 @@ export type RewardResolvedUser = {
   telegramId: string | null
 }
 
+export type RewardSpendEligibility = {
+  isTelegramUser: boolean
+  canSpendRewards: boolean
+  requiredAdsWatched: number
+  requiredReferrals: number
+  remainingAdsToWatch: number
+  remainingReferrals: number
+}
+
+export function getRewardSpendEligibility(input: {
+  telegramId: string | null
+  rewardAdsWatched: number
+  rewardReferralsCount: number
+}): RewardSpendEligibility {
+  const isTelegramUser = Boolean(input.telegramId)
+  const remainingAdsToWatch = Math.max(0, TELEGRAM_REWARD_SPEND_MIN_ADS - Number(input.rewardAdsWatched || 0))
+  const remainingReferrals = Math.max(0, TELEGRAM_REWARD_SPEND_MIN_REFERRALS - Number(input.rewardReferralsCount || 0))
+  const canSpendRewards = !isTelegramUser || (remainingAdsToWatch === 0 && remainingReferrals === 0)
+
+  return {
+    isTelegramUser,
+    canSpendRewards,
+    requiredAdsWatched: TELEGRAM_REWARD_SPEND_MIN_ADS,
+    requiredReferrals: TELEGRAM_REWARD_SPEND_MIN_REFERRALS,
+    remainingAdsToWatch,
+    remainingReferrals,
+  }
+}
+
 export async function resolveRewardUser(identity: RewardIdentityInput): Promise<RewardResolvedUser> {
   const { initData, rewardUid, firstName, username } = identity
 
@@ -144,7 +175,7 @@ export async function resolveRewardUser(identity: RewardIdentityInput): Promise<
       .maybeSingle()
   }
 
-  let { data: profile } = await existingProfileQuery
+  const { data: profile } = await existingProfileQuery
 
   let userId = profile?.id as string | undefined
   if (!userId) {

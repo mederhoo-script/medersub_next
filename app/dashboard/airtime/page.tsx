@@ -5,6 +5,7 @@ import { Smartphone, Loader2, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
+import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
 
 const NETWORKS = [
     { id: 'MTN', name: 'MTN', color: 'bg-yellow-400', serviceId: '1' },
@@ -18,7 +19,7 @@ export default function AirtimePage() {
     const [network, setNetwork] = useState(NETWORKS[0]);
     const [amount, setAmount] = useState('');
     const [phone, setPhone] = useState('');
-    const [paymentSource, setPaymentSource] = useState<'wallet' | 'reward'>('wallet');
+    const { paymentSource, setPaymentSource } = useDefaultPaymentSource();
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
 

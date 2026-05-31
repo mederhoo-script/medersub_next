@@ -5,6 +5,7 @@ import { GraduationCap, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
+import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
 
 interface EducationService {
     serviceID: string;
@@ -23,7 +24,7 @@ export default function EducationPage() {
     const [loadingServices, setLoadingServices] = useState(true);
     const [selectedService, setSelectedService] = useState<EducationService | null>(null);
     const [quantity, setQuantity] = useState(1);
-    const [paymentSource, setPaymentSource] = useState<'wallet' | 'reward'>('wallet');
+    const { paymentSource, setPaymentSource } = useDefaultPaymentSource();
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
     const [purchasedPins, setPurchasedPins] = useState<PurchasedPin[]>([]);
