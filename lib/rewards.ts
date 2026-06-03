@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { BROWSER_REWARD_UID_REGEX, TELEGRAM_AUTH_VALIDITY_SECONDS, TELEGRAM_REWARD_UID_REGEX } from '@/lib/reward-constants'
+import { normalizeReferralUid } from '@/lib/reward-referral'
 
 const DEFAULT_TELEGRAM_EMAIL_DOMAIN = 'medersub.local'
 const TELEGRAM_EMAIL_DOMAIN = process.env.TELEGRAM_EMAIL_DOMAIN ?? DEFAULT_TELEGRAM_EMAIL_DOMAIN
@@ -92,15 +93,6 @@ export type RewardSpendEligibility = {
   requiredReferrals: number
   remainingAdsToWatch: number
   remainingReferrals: number
-}
-
-function normalizeReferralUid(referredBy: string | undefined): string | null {
-  if (!referredBy) return null
-  const trimmed = referredBy.trim()
-  if (!trimmed) return null
-  if (TELEGRAM_REWARD_UID_REGEX.test(trimmed) || BROWSER_REWARD_UID_REGEX.test(trimmed)) return trimmed
-  if (/^\d+$/.test(trimmed)) return `TG-${trimmed}`
-  return null
 }
 
 export function getRewardSpendEligibility(input: {

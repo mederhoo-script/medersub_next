@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
-import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS, TELEGRAM_REWARD_UID_REGEX } from '@/lib/reward-constants'
+import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
+import { normalizeReferralUid } from '@/lib/reward-referral'
 import Link from 'next/link'
 
 type RewardProfile = {
@@ -70,14 +71,6 @@ function getOrCreateBrowserUid(): string {
   const generated = `USR${digits}`
   window.localStorage.setItem(key, generated)
   return generated
-}
-
-function normalizeReferralUid(referredBy: string | null | undefined): string | undefined {
-  const value = referredBy?.trim()
-  if (!value) return undefined
-  if (TELEGRAM_REWARD_UID_REGEX.test(value) || BROWSER_REWARD_UID_REGEX.test(value)) return value
-  if (/^\d+$/.test(value)) return `TG-${value}`
-  return undefined
 }
 
 async function triggerMonetagRewardedInterstitial(options?: MonetagAdOptions): Promise<void> {
@@ -239,10 +232,10 @@ export default function MiniappRewardsPage() {
     ;(async () => {
       try {
         setOrigin(window.location.origin)
-        const urlReferredBy = normalizeReferralUid(new URLSearchParams(window.location.search).get('ref'))
+        const normalizedUrlRef = normalizeReferralUid(new URLSearchParams(window.location.search).get('ref')) || undefined
         const tg = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp
-        const startParamReferredBy = normalizeReferralUid(tg?.initDataUnsafe?.start_param)
-        const resolvedReferredBy = urlReferredBy || startParamReferredBy
+        const normalizedStartParamRef = normalizeReferralUid(tg?.initDataUnsafe?.start_param) || undefined
+        const resolvedReferredBy = normalizedUrlRef || normalizedStartParamRef
         setReferredBy(resolvedReferredBy)
         if (tg?.ready) tg.ready()
 
