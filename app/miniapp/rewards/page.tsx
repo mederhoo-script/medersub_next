@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
-import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
+import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS, TELEGRAM_REWARD_UID_REGEX } from '@/lib/reward-constants'
 import Link from 'next/link'
 
 type RewardProfile = {
@@ -36,6 +36,7 @@ type TelegramWebApp = {
   ready?: () => void
   initData?: string
   initDataUnsafe?: {
+    start_param?: string
     user?: {
       first_name?: string
       username?: string
@@ -69,6 +70,14 @@ function getOrCreateBrowserUid(): string {
   const generated = `USR${digits}`
   window.localStorage.setItem(key, generated)
   return generated
+}
+
+function normalizeReferralUid(referredBy: string | null | undefined): string | undefined {
+  const value = referredBy?.trim()
+  if (!value) return undefined
+  if (TELEGRAM_REWARD_UID_REGEX.test(value) || BROWSER_REWARD_UID_REGEX.test(value)) return value
+  if (/^\d+$/.test(value)) return `TG-${value}`
+  return undefined
 }
 
 async function triggerMonetagRewardedInterstitial(options?: MonetagAdOptions): Promise<void> {
@@ -230,9 +239,11 @@ export default function MiniappRewardsPage() {
     ;(async () => {
       try {
         setOrigin(window.location.origin)
-        const refParam = new URLSearchParams(window.location.search).get('ref') || undefined
-        setReferredBy(refParam)
+        const urlReferredBy = normalizeReferralUid(new URLSearchParams(window.location.search).get('ref'))
         const tg = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp
+        const startParamReferredBy = normalizeReferralUid(tg?.initDataUnsafe?.start_param)
+        const resolvedReferredBy = urlReferredBy || startParamReferredBy
+        setReferredBy(resolvedReferredBy)
         if (tg?.ready) tg.ready()
 
         if (tg?.initData) {
@@ -244,13 +255,13 @@ export default function MiniappRewardsPage() {
           }
           if (!active) return
           setIdentity(nextIdentity)
-          await fetchProfile({ ...nextIdentity, referredBy: refParam })
+          await fetchProfile({ ...nextIdentity, referredBy: resolvedReferredBy })
         } else {
           const uid = getOrCreateBrowserUid()
           const nextIdentity = { rewardUid: uid }
           if (!active) return
           setIdentity(nextIdentity)
-          await fetchProfile({ ...nextIdentity, referredBy: refParam })
+          await fetchProfile({ ...nextIdentity, referredBy: resolvedReferredBy })
         }
       } catch (err: unknown) {
         const text = err instanceof Error ? err.message : 'Failed to initialize rewards app'

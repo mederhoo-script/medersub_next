@@ -94,6 +94,15 @@ export type RewardSpendEligibility = {
   remainingReferrals: number
 }
 
+function normalizeReferralUid(referredBy: string | undefined): string | null {
+  if (!referredBy) return null
+  const trimmed = referredBy.trim()
+  if (!trimmed) return null
+  if (TELEGRAM_REWARD_UID_REGEX.test(trimmed) || BROWSER_REWARD_UID_REGEX.test(trimmed)) return trimmed
+  if (/^\d+$/.test(trimmed)) return `TG-${trimmed}`
+  return null
+}
+
 export function getRewardSpendEligibility(input: {
   telegramId: string | null
   rewardAdsWatched: number
@@ -231,13 +240,14 @@ export async function resolveRewardUser(identity: RewardIdentityInput): Promise<
 }
 
 export async function applyReferralIfEligible(user: RewardResolvedUser, referredBy: string | undefined): Promise<void> {
-  if (!referredBy) return
+  const normalizedReferralUid = normalizeReferralUid(referredBy)
+  if (!normalizedReferralUid) return
   if (user.rewardReferredBy) return
-  if (referredBy === user.rewardUid) return
+  if (normalizedReferralUid === user.rewardUid) return
 
   const { error } = await supabaseAdmin.rpc('apply_reward_referral', {
     p_user_id: user.profileId,
-    p_referred_by: referredBy,
+    p_referred_by: normalizedReferralUid,
     p_source_uid: user.rewardUid,
     p_referral_bonus: REFERRAL_BONUS_NGN,
   })
