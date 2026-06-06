@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { BROWSER_REWARD_UID_REGEX, TELEGRAM_AUTH_VALIDITY_SECONDS, TELEGRAM_REWARD_UID_REGEX } from '@/lib/reward-constants'
+import { normalizeReferralUid } from '@/lib/reward-referral'
 
 const DEFAULT_TELEGRAM_EMAIL_DOMAIN = 'medersub.local'
 const TELEGRAM_EMAIL_DOMAIN = process.env.TELEGRAM_EMAIL_DOMAIN ?? DEFAULT_TELEGRAM_EMAIL_DOMAIN
@@ -231,13 +232,14 @@ export async function resolveRewardUser(identity: RewardIdentityInput): Promise<
 }
 
 export async function applyReferralIfEligible(user: RewardResolvedUser, referredBy: string | undefined): Promise<void> {
-  if (!referredBy) return
+  const normalizedReferralUid = normalizeReferralUid(referredBy)
+  if (!normalizedReferralUid) return
   if (user.rewardReferredBy) return
-  if (referredBy === user.rewardUid) return
+  if (normalizedReferralUid === user.rewardUid) return
 
   const { error } = await supabaseAdmin.rpc('apply_reward_referral', {
     p_user_id: user.profileId,
-    p_referred_by: referredBy,
+    p_referred_by: normalizedReferralUid,
     p_source_uid: user.rewardUid,
     p_referral_bonus: REFERRAL_BONUS_NGN,
   })

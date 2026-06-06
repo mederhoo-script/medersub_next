@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
 import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
+import { normalizeReferralUid } from '@/lib/reward-referral'
 import Link from 'next/link'
 
 type RewardProfile = {
@@ -36,6 +37,7 @@ type TelegramWebApp = {
   ready?: () => void
   initData?: string
   initDataUnsafe?: {
+    start_param?: string
     user?: {
       first_name?: string
       username?: string
@@ -230,9 +232,11 @@ export default function MiniappRewardsPage() {
     ;(async () => {
       try {
         setOrigin(window.location.origin)
-        const refParam = new URLSearchParams(window.location.search).get('ref') || undefined
-        setReferredBy(refParam)
+        const normalizedUrlRef = normalizeReferralUid(new URLSearchParams(window.location.search).get('ref')) || undefined
         const tg = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp
+        const normalizedStartParamRef = normalizeReferralUid(tg?.initDataUnsafe?.start_param) || undefined
+        const resolvedReferredBy = normalizedUrlRef || normalizedStartParamRef
+        setReferredBy(resolvedReferredBy)
         if (tg?.ready) tg.ready()
 
         if (tg?.initData) {
@@ -244,13 +248,13 @@ export default function MiniappRewardsPage() {
           }
           if (!active) return
           setIdentity(nextIdentity)
-          await fetchProfile({ ...nextIdentity, referredBy: refParam })
+          await fetchProfile({ ...nextIdentity, referredBy: resolvedReferredBy })
         } else {
           const uid = getOrCreateBrowserUid()
           const nextIdentity = { rewardUid: uid }
           if (!active) return
           setIdentity(nextIdentity)
-          await fetchProfile({ ...nextIdentity, referredBy: refParam })
+          await fetchProfile({ ...nextIdentity, referredBy: resolvedReferredBy })
         }
       } catch (err: unknown) {
         const text = err instanceof Error ? err.message : 'Failed to initialize rewards app'
