@@ -53,7 +53,10 @@ const MONETAG_SCRIPT_SRC = 'https://libtl.com/sdk.js'
 const MONETAG_SCRIPT_TIMEOUT_MS = 12_000
 const MONETAG_FUNCTION_WAIT_TIMEOUT_MS = 8_000
 const MONETAG_FUNCTION_WAIT_INTERVAL_MS = 250
-const TELEGRAM_REFERRAL_BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'medersub_Bot'
+const DEFAULT_TELEGRAM_REFERRAL_BOT_USERNAME = 'medersub_Bot'
+const TELEGRAM_REFERRAL_BOT_USERNAME = /^[A-Za-z0-9_]{5,32}$/.test(process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || '')
+  ? (process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME as string)
+  : DEFAULT_TELEGRAM_REFERRAL_BOT_USERNAME
 const WITHDRAWAL_MIN_EARNINGS = 20_000
 const WITHDRAWAL_MIN_REFERRALS = 5
 const WITHDRAWAL_PAYOUT_DIVISOR = 10
@@ -382,7 +385,7 @@ export default function MiniappRewardsPage() {
     const payoutAmount = earnAmount / WITHDRAWAL_PAYOUT_DIVISOR
     const confirmed = window.confirm(
       [
-        `Your withdrawal converts at earn/${WITHDRAWAL_PAYOUT_DIVISOR} (${WITHDRAWAL_PAYOUT_DIVISOR} earn = ₦1).`,
+        `Conversion rate: ${WITHDRAWAL_PAYOUT_DIVISOR} earn = ₦1.`,
         `${earnAmount.toLocaleString()} earn will pay ₦${payoutAmount.toLocaleString()}.`,
         'Confirm withdrawal?',
       ].join('\n'),
@@ -530,7 +533,7 @@ export default function MiniappRewardsPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
               <label className="block text-sm font-medium text-gray-700">Request Withdrawal</label>
               <p className="text-xs text-gray-500">
-                Minimum: {WITHDRAWAL_MIN_EARNINGS.toLocaleString()} earn and {WITHDRAWAL_MIN_REFERRALS} referrals. Payout uses earn/{WITHDRAWAL_PAYOUT_DIVISOR}.
+                Minimum: {WITHDRAWAL_MIN_EARNINGS.toLocaleString()} earn and {WITHDRAWAL_MIN_REFERRALS} referrals. Payout conversion rate: {WITHDRAWAL_PAYOUT_DIVISOR} earn = ₦1.
               </p>
               <input
                 type="number"

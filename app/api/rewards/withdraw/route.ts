@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       )
     }
     if (!/^\d{6,20}$/.test(accountNumber)) {
-      return NextResponse.json({ ok: false, error: 'Account number must contain only digits' }, { status: 400 })
+      return NextResponse.json({ ok: false, error: 'Account number must be 6-20 digits' }, { status: 400 })
     }
 
     const payoutAmountNgn = Math.round((earnAmount / WITHDRAWAL_PAYOUT_DIVISOR) * 100) / 100

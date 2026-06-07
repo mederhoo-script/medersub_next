@@ -35,7 +35,7 @@ begin
   end if;
 
   if trim(p_account_number) !~ '^[0-9]{6,20}$' then
-    raise exception 'Account number must contain only digits';
+    raise exception 'Account number must be 6-20 digits';
   end if;
 
   select reward_balance_ngn
