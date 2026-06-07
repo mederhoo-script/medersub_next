@@ -34,6 +34,10 @@ begin
     raise exception 'Account details are required';
   end if;
 
+  if trim(p_account_number) !~ '^[0-9]{6,20}$' then
+    raise exception 'Account number must contain only digits';
+  end if;
+
   select reward_balance_ngn
     into v_balance
   from public.profiles

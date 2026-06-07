@@ -382,7 +382,7 @@ export default function MiniappRewardsPage() {
     const payoutAmount = earnAmount / WITHDRAWAL_PAYOUT_DIVISOR
     const confirmed = window.confirm(
       [
-        `Your withdrawal converts at earn/${WITHDRAWAL_PAYOUT_DIVISOR} (10 earn = ₦1).`,
+        `Your withdrawal converts at earn/${WITHDRAWAL_PAYOUT_DIVISOR} (${WITHDRAWAL_PAYOUT_DIVISOR} earn = ₦1).`,
         `${earnAmount.toLocaleString()} earn will pay ₦${payoutAmount.toLocaleString()}.`,
         'Confirm withdrawal?',
       ].join('\n'),

@@ -50,6 +50,9 @@ export async function POST(req: Request) {
         { status: 400 },
       )
     }
+    if (!/^\d{6,20}$/.test(accountNumber)) {
+      return NextResponse.json({ ok: false, error: 'Account number must contain only digits' }, { status: 400 })
+    }
 
     const payoutAmountNgn = Math.round((earnAmount / WITHDRAWAL_PAYOUT_DIVISOR) * 100) / 100
     const { data: withdrawalData, error: withdrawalError } = await supabaseAdmin.rpc('request_reward_withdrawal', {
