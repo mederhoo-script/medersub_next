@@ -53,6 +53,10 @@ const MONETAG_SCRIPT_SRC = 'https://libtl.com/sdk.js'
 const MONETAG_SCRIPT_TIMEOUT_MS = 12_000
 const MONETAG_FUNCTION_WAIT_TIMEOUT_MS = 8_000
 const MONETAG_FUNCTION_WAIT_INTERVAL_MS = 250
+const TELEGRAM_REFERRAL_BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'medersub_Bot'
+const WITHDRAWAL_MIN_EARNINGS = 20_000
+const WITHDRAWAL_MIN_REFERRALS = 5
+const WITHDRAWAL_PAYOUT_DIVISOR = 10
 
 function getOrCreateBrowserUid(): string {
   const key = 'miniapp_reward_uid'
@@ -169,8 +173,10 @@ export default function MiniappRewardsPage() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [adStatus, setAdStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
-  const [withdrawAmount, setWithdrawAmount] = useState('')
-  const [origin, setOrigin] = useState('')
+  const [withdrawEarnAmount, setWithdrawEarnAmount] = useState('')
+  const [accountNumber, setAccountNumber] = useState('')
+  const [accountName, setAccountName] = useState('')
+  const [bankName, setBankName] = useState('')
   const [profile, setProfile] = useState<RewardProfile | null>(null)
   const [nextAdAt, setNextAdAt] = useState<string | null>(null)
   const [cooldownSeconds, setCooldownSeconds] = useState(0)
@@ -231,7 +237,6 @@ export default function MiniappRewardsPage() {
     let active = true
     ;(async () => {
       try {
-        setOrigin(window.location.origin)
         const normalizedUrlRef = normalizeReferralUid(new URLSearchParams(window.location.search).get('ref')) || undefined
         const tg = (window as Window & { Telegram?: { WebApp?: TelegramWebApp } }).Telegram?.WebApp
         const normalizedStartParamRef = normalizeReferralUid(tg?.initDataUnsafe?.start_param) || undefined
@@ -349,9 +354,32 @@ export default function MiniappRewardsPage() {
 
   const handleWithdraw = async () => {
     if (!profile) return
-    const amount = Number(withdrawAmount)
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const earnAmount = Number(withdrawEarnAmount)
+    if (!Number.isFinite(earnAmount) || earnAmount <= 0) {
       setMessage({ type: 'error', text: 'Enter a valid withdrawal amount' })
+      return
+    }
+    if (earnAmount < WITHDRAWAL_MIN_EARNINGS) {
+      setMessage({ type: 'error', text: `Minimum withdrawal request is ${WITHDRAWAL_MIN_EARNINGS.toLocaleString()} earn.` })
+      return
+    }
+    if (!accountNumber.trim() || !accountName.trim() || !bankName.trim()) {
+      setMessage({ type: 'error', text: 'Enter account number, account name, and bank name.' })
+      return
+    }
+    if (profile.reward_balance_ngn < WITHDRAWAL_MIN_EARNINGS || profile.reward_referrals_count < WITHDRAWAL_MIN_REFERRALS) {
+      setMessage({
+        type: 'error',
+        text: `You need at least ${WITHDRAWAL_MIN_EARNINGS.toLocaleString()} earn and ${WITHDRAWAL_MIN_REFERRALS} referrals before requesting withdrawal.`,
+      })
+      return
+    }
+
+    const payoutAmount = earnAmount / WITHDRAWAL_PAYOUT_DIVISOR
+    const confirmed = window.confirm(
+      `Your withdrawal converts to earn/${WITHDRAWAL_PAYOUT_DIVISOR}.\n${earnAmount.toLocaleString()} earn will pay ₦${payoutAmount.toLocaleString()}.\nConfirm withdrawal?`,
+    )
+    if (!confirmed) {
       return
     }
 
@@ -361,13 +389,25 @@ export default function MiniappRewardsPage() {
       const res = await fetch('/api/rewards/withdraw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...identity, amount }),
+        body: JSON.stringify({
+          ...identity,
+          earnAmount,
+          accountNumber: accountNumber.trim(),
+          accountName: accountName.trim(),
+          bankName: bankName.trim(),
+        }),
       })
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.error || 'Withdrawal failed')
-      setWithdrawAmount('')
+      setWithdrawEarnAmount('')
+      setAccountNumber('')
+      setAccountName('')
+      setBankName('')
       await loadProfile()
-      setMessage({ type: 'success', text: 'Withdrawal request submitted successfully.' })
+      setMessage({
+        type: 'success',
+        text: `Withdrawal submitted. ${earnAmount.toLocaleString()} earn converts to ₦${Number(data.payout_amount_ngn || 0).toLocaleString()}.`,
+      })
     } catch (err: unknown) {
       const text = err instanceof Error ? err.message : 'Failed to submit withdrawal'
       setMessage({ type: 'error', text })
@@ -376,7 +416,13 @@ export default function MiniappRewardsPage() {
     }
   }
 
-  const referralLink = profile ? `${origin}/miniapp/rewards?ref=${encodeURIComponent(profile.uid)}` : ''
+  const referralLink = profile
+    ? `https://t.me/${TELEGRAM_REFERRAL_BOT_USERNAME}?start=${encodeURIComponent(profile.uid.startsWith('TG-') ? profile.uid.slice(3) : profile.uid)}`
+    : ''
+  const isWithdrawalLocked =
+    !profile ||
+    profile.reward_balance_ngn < WITHDRAWAL_MIN_EARNINGS ||
+    profile.reward_referrals_count < WITHDRAWAL_MIN_REFERRALS
 
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-6">
@@ -411,6 +457,15 @@ export default function MiniappRewardsPage() {
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
               {getWatchButtonText()}
             </button>
+
+            {message && (
+              <div className={`rounded-xl p-3 text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 mt-0.5" />
+                  <span>{message.text}</span>
+                </div>
+              </div>
+            )}
 
             {profile.reward_spend_stage?.isTelegramUser && (
               <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-1">
@@ -462,17 +517,46 @@ export default function MiniappRewardsPage() {
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
               <label className="block text-sm font-medium text-gray-700">Request Withdrawal</label>
+              <p className="text-xs text-gray-500">
+                Minimum: {WITHDRAWAL_MIN_EARNINGS.toLocaleString()} earn and {WITHDRAWAL_MIN_REFERRALS} referrals. Payout uses earn/{WITHDRAWAL_PAYOUT_DIVISOR}.
+              </p>
               <input
                 type="number"
                 min="1"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                placeholder="Enter amount in NGN"
+                value={withdrawEarnAmount}
+                onChange={(e) => setWithdrawEarnAmount(e.target.value)}
+                placeholder="Enter amount in earn"
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <input
+                type="text"
+                value={accountNumber}
+                onChange={(e) => setAccountNumber(e.target.value)}
+                placeholder="Account number"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                value={accountName}
+                onChange={(e) => setAccountName(e.target.value)}
+                placeholder="Account name"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="Bank name"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {isWithdrawalLocked && (
+                <p className="text-xs text-amber-700">
+                  You need at least {WITHDRAWAL_MIN_EARNINGS.toLocaleString()} earn and {WITHDRAWAL_MIN_REFERRALS} referrals to withdraw.
+                </p>
+              )}
               <button
                 onClick={handleWithdraw}
-                disabled={busy}
+                disabled={busy || isWithdrawalLocked}
                 className="w-full py-2.5 rounded-lg bg-gray-900 text-white font-medium hover:bg-gray-800 disabled:opacity-60"
               >
                 Submit Withdrawal
@@ -480,15 +564,6 @@ export default function MiniappRewardsPage() {
             </div>
           </>
         ) : null}
-
-        {message && (
-          <div className={`rounded-xl p-3 text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-            <div className="flex items-start gap-2">
-              <CheckCircle2 className="h-4 w-4 mt-0.5" />
-              <span>{message.text}</span>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

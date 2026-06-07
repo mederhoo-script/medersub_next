@@ -101,13 +101,14 @@ export default function AdminRewardsPage() {
                 <th className="text-left px-4 py-3">User</th>
                 <th className="text-left px-4 py-3">UID</th>
                 <th className="text-left px-4 py-3">Amount</th>
+                <th className="text-left px-4 py-3">Account Details</th>
                 <th className="text-left px-4 py-3">Date</th>
                 <th className="text-right px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {(data?.pending_withdrawals || []).length === 0 ? (
-                <tr><td className="px-4 py-4 text-gray-500" colSpan={5}>No pending withdrawals.</td></tr>
+                <tr><td className="px-4 py-4 text-gray-500" colSpan={6}>No pending withdrawals.</td></tr>
               ) : (
                 (data?.pending_withdrawals || []).map((w: any) => (
                   <tr key={w.id}>
@@ -116,7 +117,15 @@ export default function AdminRewardsPage() {
                       <div className="text-xs text-gray-500">{w.profiles?.email || '—'}</div>
                     </td>
                     <td className="px-4 py-3 font-mono">{w.profiles?.reward_uid || '—'}</td>
-                    <td className="px-4 py-3 font-semibold">₦{Number(w.amount_ngn || 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 font-semibold">
+                      <div>₦{Number(w.amount_ngn || 0).toLocaleString()}</div>
+                      <div className="text-xs text-gray-500">Earn: {Number(w.earn_amount || 0).toLocaleString()}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{w.bank_name || '—'}</div>
+                      <div className="text-xs text-gray-500">{w.account_name || '—'}</div>
+                      <div className="text-xs font-mono text-gray-500">{w.account_number || '—'}</div>
+                    </td>
                     <td className="px-4 py-3">{new Date(w.created_at).toLocaleString()}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="inline-flex gap-2">
