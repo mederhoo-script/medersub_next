@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       username: body?.username,
     })
 
-    const earnAmount = Number(body?.earnAmount || body?.amount || 0)
+    const earnAmount = Number(body?.earnAmount || 0)
     if (!Number.isFinite(earnAmount) || earnAmount <= 0) {
       return NextResponse.json({ ok: false, error: 'Invalid withdrawal amount' }, { status: 400 })
     }

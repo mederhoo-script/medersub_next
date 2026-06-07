@@ -58,6 +58,10 @@ const WITHDRAWAL_MIN_EARNINGS = 20_000
 const WITHDRAWAL_MIN_REFERRALS = 5
 const WITHDRAWAL_PAYOUT_DIVISOR = 10
 
+function getReferralStartParam(uid: string): string {
+  return uid.startsWith('TG-') ? uid.slice(3) : uid
+}
+
 function getOrCreateBrowserUid(): string {
   const key = 'miniapp_reward_uid'
   const existing = window.localStorage.getItem(key)
@@ -377,7 +381,11 @@ export default function MiniappRewardsPage() {
 
     const payoutAmount = earnAmount / WITHDRAWAL_PAYOUT_DIVISOR
     const confirmed = window.confirm(
-      `Your withdrawal converts to earn/${WITHDRAWAL_PAYOUT_DIVISOR}.\n${earnAmount.toLocaleString()} earn will pay ₦${payoutAmount.toLocaleString()}.\nConfirm withdrawal?`,
+      [
+        `Your withdrawal converts to earn/${WITHDRAWAL_PAYOUT_DIVISOR}.`,
+        `${earnAmount.toLocaleString()} earn will pay ₦${payoutAmount.toLocaleString()}.`,
+        'Confirm withdrawal?',
+      ].join('\n'),
     )
     if (!confirmed) {
       return
@@ -417,7 +425,7 @@ export default function MiniappRewardsPage() {
   }
 
   const referralLink = profile
-    ? `https://t.me/${TELEGRAM_REFERRAL_BOT_USERNAME}?start=${encodeURIComponent(profile.uid.startsWith('TG-') ? profile.uid.slice(3) : profile.uid)}`
+    ? `https://t.me/${TELEGRAM_REFERRAL_BOT_USERNAME}?start=${encodeURIComponent(getReferralStartParam(profile.uid))}`
     : ''
   const isWithdrawalLocked =
     !profile ||
