@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2 } from 'lucide-react'
+import { Loader2, PlayCircle, Wallet, Gift, Copy, CheckCircle2, AlertCircle } from 'lucide-react'
 import { BROWSER_REWARD_UID_REGEX, MONETAG_SCRIPT_LOAD_DELAY_MS } from '@/lib/reward-constants'
 import { normalizeReferralUid } from '@/lib/reward-referral'
 import Link from 'next/link'
@@ -382,7 +382,7 @@ export default function MiniappRewardsPage() {
     const payoutAmount = earnAmount / WITHDRAWAL_PAYOUT_DIVISOR
     const confirmed = window.confirm(
       [
-        `Your withdrawal converts to earn/${WITHDRAWAL_PAYOUT_DIVISOR}.`,
+        `Your withdrawal converts at earn/${WITHDRAWAL_PAYOUT_DIVISOR} (10 earn = ₦1).`,
         `${earnAmount.toLocaleString()} earn will pay ₦${payoutAmount.toLocaleString()}.`,
         'Confirm withdrawal?',
       ].join('\n'),
@@ -469,7 +469,11 @@ export default function MiniappRewardsPage() {
             {message && (
               <div className={`rounded-xl p-3 text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                 <div className="flex items-start gap-2">
-                  <CheckCircle2 className="h-4 w-4 mt-0.5" />
+                  {message.type === 'success' ? (
+                    <CheckCircle2 className="h-4 w-4 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 mt-0.5" />
+                  )}
                   <span>{message.text}</span>
                 </div>
               </div>

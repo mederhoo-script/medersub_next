@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const payoutAmountNgn = Number((earnAmount / WITHDRAWAL_PAYOUT_DIVISOR).toFixed(2))
+    const payoutAmountNgn = Math.round((earnAmount / WITHDRAWAL_PAYOUT_DIVISOR) * 100) / 100
     const { data: withdrawalData, error: withdrawalError } = await supabaseAdmin.rpc('request_reward_withdrawal', {
       p_user_id: user.profileId,
       p_earn_amount: earnAmount,

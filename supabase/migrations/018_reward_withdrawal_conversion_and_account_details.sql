@@ -23,11 +23,11 @@ declare
   v_withdrawal_id bigint;
 begin
   if p_earn_amount is null or p_earn_amount <= 0 then
-    raise exception 'Invalid withdrawal amount';
+    raise exception 'Withdrawal amount must be a positive number';
   end if;
 
   if p_payout_amount_ngn is null or p_payout_amount_ngn <= 0 then
-    raise exception 'Invalid payout amount';
+    raise exception 'Payout amount must be a positive number';
   end if;
 
   if coalesce(trim(p_account_number), '') = '' or coalesce(trim(p_account_name), '') = '' or coalesce(trim(p_bank_name), '') = '' then
