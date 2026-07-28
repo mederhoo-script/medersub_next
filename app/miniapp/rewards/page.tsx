@@ -430,6 +430,9 @@ export default function MiniappRewardsPage() {
   const referralLink = profile
     ? `https://t.me/${TELEGRAM_REFERRAL_BOT_USERNAME}?start=${encodeURIComponent(getReferralStartParam(profile.uid))}`
     : ''
+  const remainingEarnForWithdrawal = Math.max(0, WITHDRAWAL_MIN_EARNINGS - Number(profile?.reward_balance_ngn || 0))
+  const remainingReferralsForWithdrawal = Math.max(0, WITHDRAWAL_MIN_REFERRALS - Number(profile?.reward_referrals_count || 0))
+  const isWithdrawalEligible = remainingEarnForWithdrawal === 0 && remainingReferralsForWithdrawal === 0
   const isWithdrawalLocked =
     !profile ||
     profile.reward_balance_ngn < WITHDRAWAL_MIN_EARNINGS ||
@@ -534,6 +537,12 @@ export default function MiniappRewardsPage() {
               <label className="block text-sm font-medium text-gray-700">Request Withdrawal</label>
               <p className="text-xs text-gray-500">
                 Minimum: {WITHDRAWAL_MIN_EARNINGS.toLocaleString()} earn and {WITHDRAWAL_MIN_REFERRALS} referrals. Payout conversion rate: {WITHDRAWAL_PAYOUT_DIVISOR} earn = ₦1.
+              </p>
+              <p className={`text-xs ${isWithdrawalEligible ? 'text-green-700' : 'text-amber-700'}`}>
+                Eligibility status:{' '}
+                {isWithdrawalEligible
+                  ? 'Eligible for withdrawal.'
+                  : `Not eligible yet. Need ${remainingEarnForWithdrawal.toLocaleString()} more earn and ${remainingReferralsForWithdrawal} more ${remainingReferralsForWithdrawal === 1 ? 'referral' : 'referrals'}.`}
               </p>
               <input
                 type="number"
