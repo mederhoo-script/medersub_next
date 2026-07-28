@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import WalletCard from '@/components/dashboard/wallet-card';
 import ServiceGrid from '@/components/dashboard/service-grid';
 import { supabase } from '@/lib/supabase';
-import { Bell, Smartphone, Wifi, Tv, Zap, GraduationCap, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Bell, Smartphone, Wifi, Tv, Zap, GraduationCap, ArrowDownRight } from 'lucide-react';
 import Link from 'next/link';
 
 interface Transaction {
@@ -20,8 +20,14 @@ interface Transaction {
     };
 }
 
+interface ProfileData {
+    full_name?: string;
+    mainBalance: number;
+    rewardBalance: number;
+}
+
 export default function DashboardPage() {
-    const [profile, setProfile] = useState<any>(null);
+    const [profile, setProfile] = useState<ProfileData | null>(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loadingTransactions, setLoadingTransactions] = useState(true);
