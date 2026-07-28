@@ -44,24 +44,24 @@ async function ensureWalletRow(userId: string): Promise<void> {
   if (error) {
     console.warn('[TG webhook] Failed to ensure wallet for userId=%s: %s', userId, error.message)
   }
+}
 
-  async function applyStartReferralIfEligible(userId: string, telegramId: string, startPayload: string): Promise<void> {
-    const normalizedReferralUid = normalizeReferralUid(startPayload)
-    if (!normalizedReferralUid) return
+async function applyStartReferralIfEligible(userId: string, telegramId: string, startPayload: string): Promise<void> {
+  const normalizedReferralUid = normalizeReferralUid(startPayload)
+  if (!normalizedReferralUid) return
 
-    const sourceUid = `TG-${telegramId}`
-    if (normalizedReferralUid === sourceUid) return
+  const sourceUid = `TG-${telegramId}`
+  if (normalizedReferralUid === sourceUid) return
 
-    const { error } = await supabaseAdmin.rpc('apply_reward_referral', {
-      p_user_id: userId,
-      p_referred_by: normalizedReferralUid,
-      p_source_uid: sourceUid,
-      p_referral_bonus: REFERRAL_BONUS_NGN,
-    })
+  const { error } = await supabaseAdmin.rpc('apply_reward_referral', {
+    p_user_id: userId,
+    p_referred_by: normalizedReferralUid,
+    p_source_uid: sourceUid,
+    p_referral_bonus: REFERRAL_BONUS_NGN,
+  })
 
-    if (error) {
-      console.warn('[TG webhook] Failed to apply start referral for userId=%s via payload=%s: %s', userId, startPayload, error.message)
-    }
+  if (error) {
+    console.warn('[TG webhook] Failed to apply start referral for userId=%s via payload=%s: %s', userId, startPayload, error.message)
   }
 }
 
