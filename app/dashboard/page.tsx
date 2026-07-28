@@ -22,28 +22,33 @@ interface Transaction {
 
 export default function DashboardPage() {
     const [profile, setProfile] = useState<any>(null);
+    const [loadingProfile, setLoadingProfile] = useState(true);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loadingTransactions, setLoadingTransactions] = useState(true);
 
     useEffect(() => {
         const fetchProfile = async () => {
-            const { data: { user }, error: userError } = await supabase.auth.getUser();
-            console.log('[Dashboard] User:', user?.email, 'Error:', userError);
+            try {
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                console.log('[Dashboard] User:', user?.email, 'Error:', userError);
 
-            if (user) {
-                const { data, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('*, wallets(balance)')
-                    .eq('id', user.id)
-                    .single();
+                if (user) {
+                    const { data, error: profileError } = await supabase
+                        .from('profiles')
+                        .select('*, wallets(balance)')
+                        .eq('id', user.id)
+                        .single();
 
-                console.log('[Dashboard] Profile:', data, 'Error:', profileError);
+                    console.log('[Dashboard] Profile:', data, 'Error:', profileError);
 
-                if (data) {
-                    const mainBalance = Number(data.wallets?.[0]?.balance || 0);
-                    const rewardBalance = Number(data.reward_balance_ngn || 0);
-                    setProfile({ ...data, mainBalance, rewardBalance });
+                    if (data) {
+                        const mainBalance = Number(data.wallets?.[0]?.balance || 0);
+                        const rewardBalance = Number(data.reward_balance_ngn || 0);
+                        setProfile({ ...data, mainBalance, rewardBalance });
+                    }
                 }
+            } finally {
+                setLoadingProfile(false);
             }
         };
         fetchProfile();
@@ -122,6 +127,7 @@ export default function DashboardPage() {
             <WalletCard
                 mainBalance={profile?.mainBalance || 0}
                 rewardBalance={profile?.rewardBalance || 0}
+                loading={loadingProfile}
             />
 
             {/* Services */}

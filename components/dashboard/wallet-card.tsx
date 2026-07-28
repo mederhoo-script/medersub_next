@@ -5,10 +5,12 @@ import { Eye, EyeOff, Plus, Send } from 'lucide-react';
 
 export default function WalletCard({
     mainBalance = 0,
-    rewardBalance = 0
+    rewardBalance = 0,
+    loading = false
 }: {
     mainBalance?: number;
     rewardBalance?: number;
+    loading?: boolean;
 } = {}) {
     const [visible, setVisible] = useState(true);
 
@@ -27,22 +29,24 @@ export default function WalletCard({
                                 <p className="text-sm text-blue-100">
                                     Main Wallet:{' '}
                                     <span className="font-bold text-white">
-                                        {visible ? `₦${mainBalance.toLocaleString()}` : '••••••••'}
+                                        {loading ? 'Loading...' : (visible ? `₦${mainBalance.toLocaleString()}` : '••••••••')}
                                     </span>
                                 </p>
                                 <p className="text-sm text-blue-100">
                                     Reward Balance:{' '}
                                     <span className="font-bold text-white">
-                                        {visible ? `₦${rewardBalance.toLocaleString()}` : '••••••••'}
+                                        {loading ? 'Loading...' : (visible ? `₦${rewardBalance.toLocaleString()}` : '••••••••')}
                                     </span>
                                 </p>
                             </div>
-                            <button
-                                onClick={() => setVisible(!visible)}
-                                className="p-1.5 hover:bg-blue-500/30 rounded-full transition-colors"
-                            >
-                                {visible ? <Eye className="h-4 w-4 text-blue-100" /> : <EyeOff className="h-4 w-4 text-blue-100" />}
-                            </button>
+                            {!loading && (
+                                <button
+                                    onClick={() => setVisible(!visible)}
+                                    className="p-1.5 hover:bg-blue-500/30 rounded-full transition-colors"
+                                >
+                                    {visible ? <Eye className="h-4 w-4 text-blue-100" /> : <EyeOff className="h-4 w-4 text-blue-100" />}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
