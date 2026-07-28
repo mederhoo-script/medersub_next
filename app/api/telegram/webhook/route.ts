@@ -1,10 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { normalizeReferralUid } from '@/lib/reward-referral'
 import crypto from 'crypto'
 
 function generateTelegramUserEmail(telegramId: string): string {
   return `telegram_${telegramId}@medersub.local`
 }
+
+const parsedReferralBonus = Number(process.env.REWARD_REFERRAL_BONUS_NGN ?? 5)
+const REFERRAL_BONUS_NGN = Number.isNaN(parsedReferralBonus) ? 5 : parsedReferralBonus
 
 
 async function upsertTelegramProfile(
@@ -24,6 +28,7 @@ async function upsertTelegramProfile(
         telegram_id: telegramId,
         telegram_username: telegramUsername,
         telegram_linked_at: new Date().toISOString(),
+        reward_uid: `TG-${telegramId}`,
       },
       { onConflict: 'id' }
     )
@@ -38,6 +43,25 @@ async function ensureWalletRow(userId: string): Promise<void> {
     .upsert({ user_id: userId, balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true })
   if (error) {
     console.warn('[TG webhook] Failed to ensure wallet for userId=%s: %s', userId, error.message)
+  }
+}
+
+async function applyStartReferralIfEligible(userId: string, telegramId: string, startPayload: string): Promise<void> {
+  const normalizedReferralUid = normalizeReferralUid(startPayload)
+  if (!normalizedReferralUid) return
+
+  const sourceUid = `TG-${telegramId}`
+  if (normalizedReferralUid === sourceUid) return
+
+  const { error } = await supabaseAdmin.rpc('apply_reward_referral', {
+    p_user_id: userId,
+    p_referred_by: normalizedReferralUid,
+    p_source_uid: sourceUid,
+    p_referral_bonus: REFERRAL_BONUS_NGN,
+  })
+
+  if (error) {
+    console.warn('[TG webhook] Failed to apply start referral for userId=%s via payload=%s: %s', userId, startPayload, error.message)
   }
 }
 
@@ -104,6 +128,7 @@ export async function POST(req: NextRequest) {
     console.log('[TG webhook] Update received — update_id=%s, message_text=%s', update.update_id, update.message?.text ?? '(no text)')
 
     const text = update.message?.text || ''
+    const startPayload = text.startsWith('/start ') ? text.slice('/start '.length).trim() : ''
     const telegramId = String(update.message?.from?.id || '')
     const telegramUsername = update.message?.from?.username || null
     const firstName = update.message?.from?.first_name || ''
@@ -157,7 +182,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Handle plain /start command - auto-create account and send login link
-    if (text === '/start' && chatId && telegramId) {
+    if ((text === '/start' || (startPayload && !startPayload.startsWith('link_') && !startPayload.startsWith('login_'))) && chatId && telegramId) {
       console.log('[TG webhook] Handling plain /start for telegramId=%s', telegramId)
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin
 
@@ -228,6 +253,9 @@ export async function POST(req: NextRequest) {
       }
 
       await ensureWalletRow(userId)
+      if (startPayload) {
+        await applyStartReferralIfEligible(userId, telegramId, startPayload)
+      }
 
       const loginCode = crypto.randomBytes(12).toString('hex')
 
