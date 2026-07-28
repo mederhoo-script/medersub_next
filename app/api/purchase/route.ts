@@ -113,6 +113,46 @@ export async function POST(req: Request) {
                 }, { status: 400 });
             }
 
+            if (profile.telegram_id) {
+                const { data: fundingTransactions, error: fundingError } = await supabaseAdmin
+                    .from('transactions')
+                    .select('charged_amount')
+                    .eq('user_id', userId)
+                    .eq('type', 'deposit')
+                    .eq('status', 'success');
+
+                if (fundingError) {
+                    console.error('Failed to load funding transactions for reward spend cap:', fundingError);
+                    return NextResponse.json({ error: 'Unable to verify reward spend cap. Please try again.' }, { status: 500 });
+                }
+
+                const { data: rewardSpendTransactions, error: rewardSpendTxError } = await supabaseAdmin
+                    .from('reward_transactions')
+                    .select('amount_ngn')
+                    .eq('user_id', userId)
+                    .eq('type', 'spend_on_vtu')
+                    .lt('amount_ngn', 0);
+
+                if (rewardSpendTxError) {
+                    console.error('Failed to load reward spend transactions for cap check:', rewardSpendTxError);
+                    return NextResponse.json({ error: 'Unable to verify reward spend cap. Please try again.' }, { status: 500 });
+                }
+
+                const totalWalletFunding = (fundingTransactions || []).reduce((sum, tx) => sum + Number(tx.charged_amount || 0), 0);
+                const totalRewardSpent = (rewardSpendTransactions || []).reduce((sum, tx) => sum + Math.abs(Number(tx.amount_ngn || 0)), 0);
+                const unlockedRewardSpend = Math.floor(totalWalletFunding / 500) * 300;
+                const projectedRewardSpend = totalRewardSpent + totalCharge;
+
+                if (projectedRewardSpend > unlockedRewardSpend) {
+                    const nextUnlockedTier = Math.ceil(projectedRewardSpend / 300);
+                    const requiredFundingForProjectedSpend = nextUnlockedTier * 500;
+                    const additionalFundingNeeded = Math.max(0, requiredFundingForProjectedSpend - totalWalletFunding);
+                    return NextResponse.json({
+                        error: `Reward spend limit reached. You've unlocked ₦${unlockedRewardSpend.toLocaleString()} reward spend from ₦${totalWalletFunding.toLocaleString()} wallet funding. Fund ₦${additionalFundingNeeded.toLocaleString()} more in main wallet to continue.`,
+                    }, { status: 400 });
+                }
+            }
+
             currentBalance = Number(profile.reward_balance_ngn || 0);
         } else {
             const { data: wallet, error: walletError } = await supabaseAdmin
