@@ -11,6 +11,7 @@ const navItems = [
     { icon: History, label: 'History', href: '/dashboard/history' },
     { icon: CreditCard, label: 'Finance', href: '/dashboard/finance' },
     { icon: User, label: 'Me', href: '/dashboard/profile' },
+    { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ];
 
 export default function MobileNav() {
@@ -63,7 +64,7 @@ export default function MobileNav() {
                         className="flex flex-col items-center justify-center flex-1 py-1 text-purple-600 min-w-0"
                     >
                         <ShieldAlert className="h-5 w-5 mb-1" />
-                        <span className="text-[9px] font-medium">Admin</span>
+                        <span className="text-[9px] font-medium">Admin Panel</span>
                     </Link>
                 )}
 
