@@ -73,6 +73,12 @@ export default function EducationPage() {
             const baseAmount = Number(selectedService.amount.replace(/,/g, ''));
             const totalAmount = baseAmount * quantity;
 
+            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.');
+            if (!transactionPin) {
+                setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
+                return;
+            }
+
             const res = await fetch('/api/purchase', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -83,7 +89,8 @@ export default function EducationPage() {
                     mobileNumber: '', // Not needed for education
                     serviceID: selectedService.serviceID,
                     quantity: quantity,
-                    paymentSource
+                    paymentSource,
+                    transactionPin
                 })
             });
 

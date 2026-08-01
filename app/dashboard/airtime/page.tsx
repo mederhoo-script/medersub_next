@@ -52,6 +52,12 @@ export default function AirtimePage() {
                 return;
             }
 
+            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.');
+            if (!transactionPin) {
+                setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
+                return;
+            }
+
             const res = await fetch('/api/purchase', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -62,7 +68,8 @@ export default function AirtimePage() {
                     mobileNumber: phone,
                     serviceID: network.serviceId,
                     network: network.id,
-                    paymentSource
+                    paymentSource,
+                    transactionPin
                 })
             });
 

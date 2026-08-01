@@ -24,6 +24,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
   const [settingPassword, setSettingPassword] = useState(false)
+  const [settingPin, setSettingPin] = useState(false)
+  const [hasTransactionPin, setHasTransactionPin] = useState(false)
+  const [mustChangeTransactionPin, setMustChangeTransactionPin] = useState(false)
   const [unlinkingTelegram, setUnlinkingTelegram] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -34,6 +37,12 @@ export default function SettingsPage() {
   const [passwordData, setPasswordData] = useState({
     newPassword: '',
     confirmPassword: '',
+  })
+
+  const [pinData, setPinData] = useState({
+    currentPin: '',
+    pin: '',
+    confirmPin: '',
   })
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -51,7 +60,7 @@ export default function SettingsPage() {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id,full_name,telegram_id,telegram_username,telegram_linked_at,created_at')
           .eq('id', user.id)
           .single()
 
@@ -61,6 +70,13 @@ export default function SettingsPage() {
           email: user.email || '',
           fullName: data?.full_name || '',
         })
+
+        const pinResponse = await fetch('/api/account/transaction-pin', { credentials: 'include' })
+        if (pinResponse.ok) {
+          const pinStatus = await pinResponse.json()
+          setHasTransactionPin(Boolean(pinStatus.hasTransactionPin))
+          setMustChangeTransactionPin(Boolean(pinStatus.mustChangeTransactionPin))
+        }
       } catch (err) {
         setMessage({ type: 'error', text: 'Failed to load profile' })
       } finally {
@@ -96,6 +112,41 @@ export default function SettingsPage() {
       setMessage({ type: 'error', text: err.message })
     } finally {
       setUnlinkingTelegram(false)
+    }
+  }
+
+  const handleUpdatePin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+
+    if (!/^\d{4}$/.test(pinData.pin) || pinData.pin !== pinData.confirmPin) {
+      setMessage({ type: 'error', text: 'Enter matching 4-digit PINs.' })
+      setLoading(false)
+      return
+    }
+
+    try {
+      const response = await fetch('/api/account/transaction-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(pinData),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to save transaction PIN')
+      }
+
+      setMessage({ type: 'success', text: 'Transaction PIN saved successfully' })
+      setSettingPin(false)
+      setPinData({ currentPin: '', pin: '', confirmPin: '' })
+      setHasTransactionPin(true)
+      setMustChangeTransactionPin(false)
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -271,6 +322,87 @@ export default function SettingsPage() {
                 >
                   Cancel
                 </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+
+        {/* Transaction PIN Section */}
+        <div className="mb-6 pb-6 border-b border-gray-200">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start gap-3">
+              <Lock className="w-5 h-5 text-purple-600 mt-1" />
+              <div>
+                <p className="font-medium text-gray-900">Transaction PIN</p>
+                <p className="text-sm text-gray-600">Use a 4-digit PIN to approve wallet and reward purchases.</p>
+                <div className={`flex items-center gap-1 text-xs mt-1 ${mustChangeTransactionPin ? 'text-amber-600' : 'text-green-600'}`}>
+                  <CheckCircle2 className="w-4 h-4" />
+                  {mustChangeTransactionPin ? 'Default PIN must be changed before purchases' : hasTransactionPin ? 'Active' : 'Not set'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {!settingPin && (
+            <button
+              onClick={() => setSettingPin(true)}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium ml-8"
+            >
+              {mustChangeTransactionPin ? 'Change Default Transaction PIN' : hasTransactionPin ? 'Change Transaction PIN' : 'Create Transaction PIN'}
+            </button>
+          )}
+
+          {settingPin && (
+            <form onSubmit={handleUpdatePin} className="space-y-4 mt-4 pt-4 border-t border-gray-200 ml-8">
+              {hasTransactionPin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Current PIN</label>
+                  {mustChangeTransactionPin && <p className="text-xs text-amber-700 mb-1">Your current default PIN is 1234. Choose a new PIN to enable purchases.</p>}
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="\d{4}"
+                    maxLength={4}
+                    value={pinData.currentPin}
+                    onChange={(e) => setPinData({ ...pinData, currentPin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter current 4-digit PIN"
+                    required
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="\d{4}"
+                  maxLength={4}
+                  value={pinData.pin}
+                  onChange={(e) => setPinData({ ...pinData, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter 4-digit PIN"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="\d{4}"
+                  maxLength={4}
+                  value={pinData.confirmPin}
+                  onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Confirm 4-digit PIN"
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">Save PIN</button>
+                <button type="button" onClick={() => setSettingPin(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">Cancel</button>
               </div>
             </form>
           )}

@@ -116,6 +116,12 @@ export default function CablePage() {
                 return;
             }
 
+            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.');
+            if (!transactionPin) {
+                setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
+                return;
+            }
+
             const res = await fetch('/api/purchase', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -127,7 +133,8 @@ export default function CablePage() {
                     serviceID: selectedPlan.serviceID,
                     network: provider.id, // For tracking
                     planName: selectedPlan.cablePlan,
-                    paymentSource
+                    paymentSource,
+                    transactionPin
                 })
             });
 

@@ -1,17 +1,52 @@
 import { NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 // Force rebuild
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { inlomax } from '@/lib/inlomax';
 import { calculateDataProfit } from '@/utils/pricing';
 import { getRewardSpendEligibility } from '@/lib/rewards';
+import { TRANSACTION_PIN_PATTERN, verifyTransactionPin } from '@/lib/transaction-pin';
 
 type SystemSettingRow = { key: string; value: unknown };
+
+
+async function getAuthenticatedUserId() {
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                getAll() {
+                    return cookieStore.getAll();
+                },
+                setAll(cookiesToSet) {
+                    cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+                },
+            },
+        }
+    );
+
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) return null;
+    return user.id;
+}
 
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { userId, serviceType, amount, mobileNumber, serviceID, network, planName, meterType, quantity, paymentSource } = body;
+        const { userId, serviceType, amount, mobileNumber, serviceID, network, planName, meterType, quantity, paymentSource, transactionPin } = body;
         const selectedPaymentSource = paymentSource === 'reward' ? 'reward' : 'wallet';
+        const authenticatedUserId = await getAuthenticatedUserId();
+
+        if (!authenticatedUserId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        if (authenticatedUserId !== userId) {
+            return NextResponse.json({ error: 'You can only make purchases from your own account.' }, { status: 403 });
+        }
 
         console.log('Purchase Request:', { userId, serviceType, amount, mobileNumber, planName });
 
@@ -22,6 +57,32 @@ export async function POST(req: Request) {
 
         if (serviceType !== 'EDUCATION' && !mobileNumber) {
             return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 });
+        }
+
+        if (!TRANSACTION_PIN_PATTERN.test(transactionPin || '')) {
+            return NextResponse.json({ error: 'Enter your 4-digit transaction PIN.' }, { status: 400 });
+        }
+
+        const { data: pinProfile, error: pinProfileError } = await supabaseAdmin
+            .from('profiles')
+            .select('transaction_pin_hash, transaction_pin_changed')
+            .eq('id', userId)
+            .single();
+
+        if (pinProfileError || !pinProfile) {
+            return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
+        }
+
+        if (!pinProfile.transaction_pin_hash) {
+            return NextResponse.json({ error: 'Set up your transaction PIN in Account Settings before making purchases.' }, { status: 403 });
+        }
+
+        if (!pinProfile.transaction_pin_changed) {
+            return NextResponse.json({ error: 'Change your default transaction PIN in Account Settings before making purchases.' }, { status: 403 });
+        }
+
+        if (!verifyTransactionPin(transactionPin, pinProfile.transaction_pin_hash)) {
+            return NextResponse.json({ error: 'Invalid transaction PIN.' }, { status: 401 });
         }
 
         // 0. Check for Maintenance Mode & Markup
