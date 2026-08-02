@@ -264,7 +264,6 @@ export default function DataPage() {
                     {!biometricSupported && biometricSupportMessage && (
                         <p className="mt-2 text-xs text-gray-500">{biometricSupportMessage}</p>
                     )}
-                    </div>
 
                 </form>
             </div>
