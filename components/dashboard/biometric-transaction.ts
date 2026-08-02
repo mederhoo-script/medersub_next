@@ -4,20 +4,30 @@ import { startAuthentication, startRegistration } from '@simplewebauthn/browser'
 
 function normalizeBiometricError(error: unknown, fallback: string) {
   if (error instanceof Error) {
-    const message = error.message;
-    if (message.includes('not supported')) {
-      return 'This device does not support biometric approval.';
+    const name = error.name || '';
+    const message = error.message || '';
+
+    if (name === 'NotAllowedError') {
+      return 'Biometric approval was cancelled or blocked. Please try again or use your transaction PIN.';
     }
-    if (message.includes('secure connection') || message.includes('HTTPS')) {
-      return message;
+
+    if (name === 'NotSupportedError' || message.includes('not supported')) {
+      return 'This browser does not support biometric approval. Please use a recent version of Chrome, Safari, or Edge on your phone, and open the app over HTTPS or localhost.';
     }
+
+    if (name === 'SecurityError' || message.includes('secure connection') || message.includes('secure context') || message.includes('HTTPS') || message.includes('https')) {
+      return 'Biometrics require a secure connection. Please open the app over HTTPS or localhost.';
+    }
+
     if (message.includes('Set up fingerprint') || message.includes('first')) {
       return message;
     }
+
     if (message.includes('expired') || message.includes('already been used')) {
       return message;
     }
-    return message;
+
+    return message || fallback;
   }
 
   return fallback;
@@ -28,12 +38,11 @@ async function ensureBiometricAvailability() {
     throw new Error('Biometrics are not supported on this device.');
   }
 
-  if (!window.isSecureContext) {
+  const isSecure = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  if (!isSecure) {
     throw new Error('Biometrics require a secure connection. Please open the app over HTTPS or localhost.');
   }
 
-  // Some browsers and mobile webviews return a false negative for the capability probe
-  // even when biometrics are configured. We should not block the WebAuthn flow here.
   if (typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
     try {
       await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
