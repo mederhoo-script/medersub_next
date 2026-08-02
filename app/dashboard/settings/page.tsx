@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut } from 'lucide-react'
+import { enrollTransactionBiometrics } from '@/components/dashboard/biometric-transaction'
 
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false })
 
@@ -147,6 +148,15 @@ export default function SettingsPage() {
       setMessage({ type: 'error', text: err.message })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleEnrollBiometrics = async () => {
+    try {
+      await enrollTransactionBiometrics()
+      setMessage({ type: 'success', text: 'Fingerprint / Face ID is ready for transaction approval.' })
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message })
     }
   }
 
@@ -327,6 +337,17 @@ export default function SettingsPage() {
           )}
         </div>
 
+
+        <div className="mb-6 pb-6 border-b border-gray-200">
+          <div className="flex items-start gap-3">
+            <Lock className="w-5 h-5 text-purple-600 mt-1" />
+            <div>
+              <p className="font-medium text-gray-900">Fingerprint / Face ID</p>
+              <p className="text-sm text-gray-600">Use your device biometrics to approve transactions.</p>
+              <button type="button" onClick={handleEnrollBiometrics} className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-700">Set up biometrics</button>
+            </div>
+          </div>
+        </div>
 
         {/* Transaction PIN Section */}
         <div className="mb-6 pb-6 border-b border-gray-200">
