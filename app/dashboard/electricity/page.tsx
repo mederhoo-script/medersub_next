@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
 import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
+import { useTransactionPin } from '@/components/dashboard/use-transaction-pin';
 
 // Static fallbacks just in case, or initial state structure
 // Real app fetches from /api/services
@@ -15,6 +16,7 @@ const METER_TYPES = [
 ];
 
 export default function ElectricityPage() {
+    const { requestPin, PinDialog } = useTransactionPin();
     const router = useRouter();
     const [discos, setDiscos] = useState<any[]>([]);
     const [loadingDiscos, setLoadingDiscos] = useState(true);
@@ -102,7 +104,7 @@ export default function ElectricityPage() {
                 return;
             }
 
-            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.')?.replace(/\D/g, '').slice(0, 4);
+            const transactionPin = await requestPin();
             if (!transactionPin) {
                 setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
                 return;
@@ -289,6 +291,7 @@ export default function ElectricityPage() {
                     </button>
                 </form>
             </div>
+            {PinDialog}
         </div>
     );
 }

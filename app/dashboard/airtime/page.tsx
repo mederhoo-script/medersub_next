@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
 import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
+import { useTransactionPin } from '@/components/dashboard/use-transaction-pin';
 
 const NETWORKS = [
     { id: 'MTN', name: 'MTN', color: 'bg-yellow-400', serviceId: '1' },
@@ -15,6 +16,7 @@ const NETWORKS = [
 ];
 
 export default function AirtimePage() {
+    const { requestPin, PinDialog } = useTransactionPin();
     const router = useRouter();
     const [network, setNetwork] = useState(NETWORKS[0]);
     const [amount, setAmount] = useState('');
@@ -52,7 +54,7 @@ export default function AirtimePage() {
                 return;
             }
 
-            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.')?.replace(/\D/g, '').slice(0, 4);
+            const transactionPin = await requestPin();
             if (!transactionPin) {
                 setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
                 return;
@@ -201,6 +203,7 @@ export default function AirtimePage() {
                     </button>
                 </form>
             </div>
+            {PinDialog}
         </div>
     );
 }

@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
 import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
+import { useTransactionPin } from '@/components/dashboard/use-transaction-pin';
 
 // Provider Data based on user inputs/standard IDs
 const PROVIDERS = [
@@ -18,6 +19,7 @@ const PROVIDERS = [
 // const ALL_PLANS = []; // Removed hardcoded plans
 
 export default function CablePage() {
+    const { requestPin, PinDialog } = useTransactionPin();
     const router = useRouter();
     const [provider, setProvider] = useState(PROVIDERS[0]);
     const [iuc, setIuc] = useState('');
@@ -116,7 +118,7 @@ export default function CablePage() {
                 return;
             }
 
-            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.')?.replace(/\D/g, '').slice(0, 4);
+            const transactionPin = await requestPin();
             if (!transactionPin) {
                 setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
                 return;
@@ -280,6 +282,7 @@ export default function CablePage() {
                     </button>
                 </div>
             </div>
+            {PinDialog}
         </div>
     );
 }

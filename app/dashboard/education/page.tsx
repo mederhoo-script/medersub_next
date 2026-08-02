@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
 import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
+import { useTransactionPin } from '@/components/dashboard/use-transaction-pin';
 
 interface EducationService {
     serviceID: string;
@@ -19,6 +20,7 @@ interface PurchasedPin {
 }
 
 export default function EducationPage() {
+    const { requestPin, PinDialog } = useTransactionPin();
     const router = useRouter();
     const [educationServices, setEducationServices] = useState<EducationService[]>([]);
     const [loadingServices, setLoadingServices] = useState(true);
@@ -73,7 +75,7 @@ export default function EducationPage() {
             const baseAmount = Number(selectedService.amount.replace(/,/g, ''));
             const totalAmount = baseAmount * quantity;
 
-            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.')?.replace(/\D/g, '').slice(0, 4);
+            const transactionPin = await requestPin();
             if (!transactionPin) {
                 setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
                 return;
@@ -263,6 +265,7 @@ export default function EducationPage() {
 
                 </form>
             </div>
+            {PinDialog}
         </div>
     );
 }

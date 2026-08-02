@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
 import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
+import { useTransactionPin } from '@/components/dashboard/use-transaction-pin';
 
 // Static Network Defs (Inlomax usually returns these or we map them)
 const NETWORKS = [
@@ -18,6 +19,7 @@ const NETWORKS = [
 import { calculateDataProfit } from '@/utils/pricing';
 
 export default function DataPage() {
+    const { requestPin, PinDialog } = useTransactionPin();
     // ... (rest of imports and state)
     const router = useRouter();
     const [network, setNetwork] = useState(NETWORKS[0]);
@@ -74,7 +76,7 @@ export default function DataPage() {
                 return;
             }
 
-            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.')?.replace(/\D/g, '').slice(0, 4);
+            const transactionPin = await requestPin();
             if (!transactionPin) {
                 setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
                 return;
@@ -230,6 +232,7 @@ export default function DataPage() {
 
                 </form>
             </div>
+            {PinDialog}
         </div>
     );
 }
