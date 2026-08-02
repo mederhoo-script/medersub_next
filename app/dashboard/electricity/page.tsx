@@ -16,7 +16,7 @@ const METER_TYPES = [
 ];
 
 export default function ElectricityPage() {
-    const { requestPin, requestBiometricApproval, PinDialog } = useTransactionPin();
+    const { requestPin, requestBiometricApproval, PinDialog, biometricSupported, biometricSupportMessage } = useTransactionPin();
     const router = useRouter();
     const [discos, setDiscos] = useState<any[]>([]);
     const [loadingDiscos, setLoadingDiscos] = useState(true);
@@ -314,14 +314,17 @@ export default function ElectricityPage() {
                         <button
                             type="button"
                             onClick={handleBiometricPurchase}
-                            disabled={loading || !customerName}
-                            className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-yellow-200 bg-yellow-50 text-yellow-700 transition-colors hover:bg-yellow-100 disabled:opacity-70"
+                            disabled={loading || !customerName || !biometricSupported}
+                            className={`shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border ${biometricSupported ? 'border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100' : 'border-gray-200 bg-gray-100 text-gray-400'} transition-colors disabled:opacity-70`}
                             aria-label="Use fingerprint to pay"
-                            title="Use fingerprint to pay"
+                            title={biometricSupported ? 'Use fingerprint to pay' : biometricSupportMessage || 'Fingerprint not available'}
                         >
                             <Fingerprint className="h-5 w-5" />
                         </button>
                     </div>
+                    {!biometricSupported && biometricSupportMessage && (
+                        <p className="mt-2 text-xs text-gray-500">{biometricSupportMessage}</p>
+                    )}
                 </form>
             </div>
             {PinDialog}

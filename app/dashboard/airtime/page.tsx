@@ -16,7 +16,7 @@ const NETWORKS = [
 ];
 
 export default function AirtimePage() {
-    const { requestPin, requestBiometricApproval, PinDialog } = useTransactionPin();
+    const { requestPin, requestBiometricApproval, PinDialog, biometricSupported, biometricSupportMessage } = useTransactionPin();
     const router = useRouter();
     const [network, setNetwork] = useState(NETWORKS[0]);
     const [amount, setAmount] = useState('');
@@ -226,14 +226,17 @@ export default function AirtimePage() {
                         <button
                             type="button"
                             onClick={handleBiometricPurchase}
-                            disabled={loading}
-                            className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 transition-colors hover:bg-blue-100 disabled:opacity-70"
+                            disabled={loading || !biometricSupported}
+                            className={`shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border ${biometricSupported ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100' : 'border-gray-200 bg-gray-100 text-gray-400'} transition-colors disabled:opacity-70`}
                             aria-label="Use fingerprint to pay"
-                            title="Use fingerprint to pay"
+                            title={biometricSupported ? 'Use fingerprint to pay' : biometricSupportMessage || 'Fingerprint not available'}
                         >
                             <Fingerprint className="h-5 w-5" />
                         </button>
                     </div>
+                    {!biometricSupported && biometricSupportMessage && (
+                        <p className="mt-2 text-xs text-gray-500">{biometricSupportMessage}</p>
+                    )}
                 </form>
             </div>
             {PinDialog}

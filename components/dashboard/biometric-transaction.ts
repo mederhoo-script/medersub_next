@@ -12,7 +12,7 @@ function normalizeBiometricError(error: unknown, fallback: string) {
     }
 
     if (name === 'NotSupportedError' || message.includes('not supported')) {
-      return 'This browser does not support biometric approval. Please use a recent version of Chrome, Safari, or Edge on your phone, and open the app over HTTPS or localhost.';
+      return 'Biometric approval is not supported in this browser or app environment. Use Chrome, Safari, or Edge directly over HTTPS, not inside an embedded webview.';
     }
 
     if (name === 'SecurityError' || message.includes('secure connection') || message.includes('secure context') || message.includes('HTTPS') || message.includes('https')) {
@@ -33,14 +33,43 @@ function normalizeBiometricError(error: unknown, fallback: string) {
   return fallback;
 }
 
-async function ensureBiometricAvailability() {
-  if (typeof window === 'undefined' || typeof window.PublicKeyCredential === 'undefined') {
-    throw new Error('Biometrics are not supported on this device.');
+function isEmbeddedBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  return /FBAN|FBAV|Instagram|Twitter|Line|WhatsApp|Snapchat|Telegram|TikTok|WeChat|Pinterest/i.test(ua);
+}
+
+export async function checkBiometricSupport() {
+  if (typeof window === 'undefined') {
+    return { supported: false, message: 'Biometrics are only available in the browser.' };
+  }
+
+  if (isEmbeddedBrowser()) {
+    return {
+      supported: false,
+      message: 'Biometric approval may not work inside embedded app browsers. Open this page in Safari or Chrome directly over HTTPS.',
+    };
+  }
+
+  if (typeof window.PublicKeyCredential === 'undefined') {
+    return {
+      supported: false,
+      message: 'Your browser does not support WebAuthn biometric approval. Use Safari or Chrome on your phone over HTTPS.',
+    };
   }
 
   const isSecure = window.isSecureContext || window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   if (!isSecure) {
-    throw new Error('Biometrics require a secure connection. Please open the app over HTTPS or localhost.');
+    return { supported: false, message: 'Biometrics require a secure HTTPS connection or localhost.' };
+  }
+
+  return { supported: true };
+}
+
+async function ensureBiometricAvailability() {
+  const support = await checkBiometricSupport();
+  if (!support.supported) {
+    throw new Error(support.message || 'Biometrics are not supported on this device.');
   }
 
   if (typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {

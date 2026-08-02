@@ -19,7 +19,7 @@ const PROVIDERS = [
 // const ALL_PLANS = []; // Removed hardcoded plans
 
 export default function CablePage() {
-    const { requestPin, requestBiometricApproval, PinDialog } = useTransactionPin();
+    const { requestPin, requestBiometricApproval, PinDialog, biometricSupported, biometricSupportMessage } = useTransactionPin();
     const router = useRouter();
     const [provider, setProvider] = useState(PROVIDERS[0]);
     const [iuc, setIuc] = useState('');
@@ -305,14 +305,17 @@ export default function CablePage() {
                         <button
                             type="button"
                             onClick={handleBiometricPurchase}
-                            disabled={loading || !selectedPlan || !customerName}
-                            className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 transition-colors hover:bg-blue-100 disabled:opacity-70"
+                            disabled={loading || !selectedPlan || !customerName || !biometricSupported}
+                            className={`shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border ${biometricSupported ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100' : 'border-gray-200 bg-gray-100 text-gray-400'} transition-colors disabled:opacity-70`}
                             aria-label="Use fingerprint to pay"
-                            title="Use fingerprint to pay"
+                            title={biometricSupported ? 'Use fingerprint to pay' : biometricSupportMessage || 'Fingerprint not available'}
                         >
                             <Fingerprint className="h-5 w-5" />
                         </button>
                     </div>
+                    {!biometricSupported && biometricSupportMessage && (
+                        <p className="mt-2 text-xs text-gray-500">{biometricSupportMessage}</p>
+                    )}
                 </div>
             </div>
             {PinDialog}

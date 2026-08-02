@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { approveTransactionWithBiometrics } from '@/components/dashboard/biometric-transaction';
+import { useEffect, useState } from 'react';
+import { approveTransactionWithBiometrics, checkBiometricSupport } from '@/components/dashboard/biometric-transaction';
 
 export function useTransactionPin() {
   const [open, setOpen] = useState(false);
   const [pin, setPin] = useState('');
   const [resolvePin, setResolvePin] = useState<((value: string | null) => void) | null>(null);
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricSupportMessage, setBiometricSupportMessage] = useState<string | null>(null);
 
   const requestPin = () => new Promise<string | null>((resolve) => {
     setPin('');
@@ -17,6 +19,16 @@ export function useTransactionPin() {
   const requestBiometricApproval = async () => {
     return await approveTransactionWithBiometrics();
   };
+
+  useEffect(() => {
+    const loadSupport = async () => {
+      const support = await checkBiometricSupport();
+      setBiometricSupported(support.supported);
+      setBiometricSupportMessage(support.message || null);
+    };
+
+    loadSupport();
+  }, []);
 
   const close = (value: string | null) => {
     setOpen(false);
@@ -54,5 +66,5 @@ export function useTransactionPin() {
     </div>
   ) : null;
 
-  return { requestPin, requestBiometricApproval, PinDialog };
+  return { requestPin, requestBiometricApproval, PinDialog, biometricSupported, biometricSupportMessage };
 }

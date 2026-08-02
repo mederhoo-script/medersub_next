@@ -20,7 +20,7 @@ interface PurchasedPin {
 }
 
 export default function EducationPage() {
-    const { requestPin, requestBiometricApproval, PinDialog } = useTransactionPin();
+    const { requestPin, requestBiometricApproval, PinDialog, biometricSupported, biometricSupportMessage } = useTransactionPin();
     const router = useRouter();
     const [educationServices, setEducationServices] = useState<EducationService[]>([]);
     const [loadingServices, setLoadingServices] = useState(true);
@@ -287,13 +287,17 @@ export default function EducationPage() {
                         <button
                             type="button"
                             onClick={handleBiometricPurchase}
-                            disabled={loading || !selectedService}
-                            className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-green-200 bg-green-50 text-green-600 transition-colors hover:bg-green-100 disabled:opacity-70"
+                            disabled={loading || !selectedService || !biometricSupported}
+                            className={`shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border ${biometricSupported ? 'border-green-200 bg-green-50 text-green-600 hover:bg-green-100' : 'border-gray-200 bg-gray-100 text-gray-400'} transition-colors disabled:opacity-70`}
                             aria-label="Use fingerprint to buy"
-                            title="Use fingerprint to buy"
+                            title={biometricSupported ? 'Use fingerprint to buy' : biometricSupportMessage || 'Fingerprint not available'}
                         >
                             <Fingerprint className="h-5 w-5" />
                         </button>
+                    </div>
+                    {!biometricSupported && biometricSupportMessage && (
+                        <p className="mt-2 text-xs text-gray-500">{biometricSupportMessage}</p>
+                    )}
                     </div>
 
                 </form>
