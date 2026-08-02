@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Tv, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Tv, Loader2, ArrowLeft, CheckCircle2, Fingerprint } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
@@ -19,7 +19,7 @@ const PROVIDERS = [
 // const ALL_PLANS = []; // Removed hardcoded plans
 
 export default function CablePage() {
-    const { requestPin, PinDialog } = useTransactionPin();
+    const { requestPin, requestBiometricApproval, PinDialog } = useTransactionPin();
     const router = useRouter();
     const [provider, setProvider] = useState(PROVIDERS[0]);
     const [iuc, setIuc] = useState('');
@@ -101,8 +101,7 @@ export default function CablePage() {
         }
     };
 
-    const handlePurchase = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const submitPurchase = async (approvalType: 'pin' | 'biometric') => {
         if (!selectedPlan || !customerName) {
             setStatus({ type: 'error', msg: 'Please validate IUC and select a plan' });
             return;
@@ -118,26 +117,37 @@ export default function CablePage() {
                 return;
             }
 
-            const transactionPin = await requestPin();
-            if (!transactionPin) {
-                setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
-                return;
+            const body: Record<string, unknown> = {
+                userId: user.id,
+                serviceType: 'CABLE',
+                amount: Number(selectedPlan.amount.toString().replace(/,/g, '')),
+                mobileNumber: iuc,
+                serviceID: selectedPlan.serviceID,
+                network: provider.id,
+                planName: selectedPlan.cablePlan,
+                paymentSource,
+            };
+
+            if (approvalType === 'biometric') {
+                const biometricToken = await requestBiometricApproval();
+                if (!biometricToken) {
+                    setStatus({ type: 'error', msg: 'Fingerprint approval was cancelled.' });
+                    return;
+                }
+                body.biometricToken = biometricToken;
+            } else {
+                const transactionPin = await requestPin();
+                if (!transactionPin) {
+                    setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
+                    return;
+                }
+                body.transactionPin = transactionPin;
             }
 
             const res = await fetch('/api/purchase', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.id,
-                    serviceType: 'CABLE',
-                    amount: Number(selectedPlan.amount.toString().replace(/,/g, '')),
-                    mobileNumber: iuc, // Using mobileNumber field for IUC
-                    serviceID: selectedPlan.serviceID,
-                    network: provider.id, // For tracking
-                    planName: selectedPlan.cablePlan,
-                    paymentSource,
-                    transactionPin
-                })
+                body: JSON.stringify(body)
             });
 
             const data = await res.json();
@@ -153,10 +163,21 @@ export default function CablePage() {
             }
 
         } catch (error) {
-            setStatus({ type: 'error', msg: 'Something went wrong.' });
+            const message = error instanceof Error ? error.message : 'Something went wrong.';
+            setStatus({ type: 'error', msg: message });
         } finally {
             setLoading(false);
         }
+    };
+
+    const handlePurchase = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await submitPurchase('pin');
+    };
+
+    const handleBiometricPurchase = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        await submitPurchase('biometric');
     };
 
     return (
@@ -272,14 +293,26 @@ export default function CablePage() {
                         </div>
                     )}
 
-                    <button
-                        type="button"
-                        onClick={handlePurchase}
-                        disabled={loading || !selectedPlan || !customerName}
-                        className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
-                    >
-                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Pay Now'}
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            type="button"
+                            onClick={handlePurchase}
+                            disabled={loading || !selectedPlan || !customerName}
+                            className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Pay Now'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleBiometricPurchase}
+                            disabled={loading || !selectedPlan || !customerName}
+                            className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 transition-colors hover:bg-blue-100 disabled:opacity-70"
+                            aria-label="Use fingerprint to pay"
+                            title="Use fingerprint to pay"
+                        >
+                            <Fingerprint className="h-5 w-5" />
+                        </button>
+                    </div>
                 </div>
             </div>
             {PinDialog}

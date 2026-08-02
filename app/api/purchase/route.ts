@@ -36,7 +36,7 @@ async function getAuthenticatedUserId() {
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { userId, serviceType, amount, mobileNumber, serviceID, network, planName, meterType, quantity, paymentSource, transactionPin } = body;
+        const { userId, serviceType, amount, mobileNumber, serviceID, network, planName, meterType, quantity, paymentSource, transactionPin, biometricToken } = body;
         const selectedPaymentSource = paymentSource === 'reward' ? 'reward' : 'wallet';
         const authenticatedUserId = await getAuthenticatedUserId();
 
@@ -59,30 +59,53 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 });
         }
 
-        if (!TRANSACTION_PIN_PATTERN.test(transactionPin || '')) {
-            return NextResponse.json({ error: 'Enter your 4-digit transaction PIN.' }, { status: 400 });
+        const hasBiometricToken = typeof biometricToken === 'string' && biometricToken.trim().length > 0;
+        if (!hasBiometricToken && !TRANSACTION_PIN_PATTERN.test(transactionPin || '')) {
+            return NextResponse.json({ error: 'Enter your 4-digit transaction PIN or approve with biometrics.' }, { status: 400 });
         }
 
-        const { data: pinProfile, error: pinProfileError } = await supabaseAdmin
-            .from('profiles')
-            .select('transaction_pin_hash, transaction_pin_changed')
-            .eq('id', userId)
-            .single();
+        if (hasBiometricToken) {
+            const { data: approval, error: approvalError } = await supabaseAdmin
+                .from('transaction_biometric_approvals')
+                .select('token, expires_at, consumed_at')
+                .eq('token', biometricToken)
+                .eq('user_id', userId)
+                .maybeSingle();
 
-        if (pinProfileError || !pinProfile) {
-            return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
-        }
+            if (approvalError || !approval) {
+                return NextResponse.json({ error: 'Invalid biometric approval.' }, { status: 401 });
+            }
 
-        if (!pinProfile.transaction_pin_hash) {
-            return NextResponse.json({ error: 'Set up your transaction PIN in Account Settings before making purchases.' }, { status: 403 });
-        }
+            if (approval.consumed_at || new Date(approval.expires_at) < new Date()) {
+                return NextResponse.json({ error: 'Biometric approval has expired or already been used.' }, { status: 401 });
+            }
 
-        if (!pinProfile.transaction_pin_changed) {
-            return NextResponse.json({ error: 'Change your default transaction PIN in Account Settings before making purchases.' }, { status: 403 });
-        }
+            await supabaseAdmin
+                .from('transaction_biometric_approvals')
+                .update({ consumed_at: new Date().toISOString() })
+                .eq('token', biometricToken);
+        } else {
+            const { data: pinProfile, error: pinProfileError } = await supabaseAdmin
+                .from('profiles')
+                .select('transaction_pin_hash, transaction_pin_changed')
+                .eq('id', userId)
+                .single();
 
-        if (!verifyTransactionPin(transactionPin, pinProfile.transaction_pin_hash)) {
-            return NextResponse.json({ error: 'Invalid transaction PIN.' }, { status: 401 });
+            if (pinProfileError || !pinProfile) {
+                return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
+            }
+
+            if (!pinProfile.transaction_pin_hash) {
+                return NextResponse.json({ error: 'Set up your transaction PIN in Account Settings before making purchases.' }, { status: 403 });
+            }
+
+            if (!pinProfile.transaction_pin_changed) {
+                return NextResponse.json({ error: 'Change your default transaction PIN in Account Settings before making purchases.' }, { status: 403 });
+            }
+
+            if (!verifyTransactionPin(transactionPin, pinProfile.transaction_pin_hash)) {
+                return NextResponse.json({ error: 'Invalid transaction PIN.' }, { status: 401 });
+            }
         }
 
         // 0. Check for Maintenance Mode & Markup

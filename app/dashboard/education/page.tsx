@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { GraduationCap, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { GraduationCap, Loader2, ArrowLeft, CheckCircle2, Fingerprint } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
@@ -20,7 +20,7 @@ interface PurchasedPin {
 }
 
 export default function EducationPage() {
-    const { requestPin, PinDialog } = useTransactionPin();
+    const { requestPin, requestBiometricApproval, PinDialog } = useTransactionPin();
     const router = useRouter();
     const [educationServices, setEducationServices] = useState<EducationService[]>([]);
     const [loadingServices, setLoadingServices] = useState(true);
@@ -58,8 +58,7 @@ export default function EducationPage() {
         return (baseAmount + profitPerPin) * quantity;
     };
 
-    const handlePurchase = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const submitPurchase = async (approvalType: 'pin' | 'biometric') => {
         if (!selectedService) return;
         setLoading(true);
         setStatus(null);
@@ -75,25 +74,36 @@ export default function EducationPage() {
             const baseAmount = Number(selectedService.amount.replace(/,/g, ''));
             const totalAmount = baseAmount * quantity;
 
-            const transactionPin = await requestPin();
-            if (!transactionPin) {
-                setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
-                return;
+            const body: Record<string, unknown> = {
+                userId: user.id,
+                serviceType: 'EDUCATION',
+                amount: totalAmount,
+                mobileNumber: '',
+                serviceID: selectedService.serviceID,
+                quantity: quantity,
+                paymentSource,
+            };
+
+            if (approvalType === 'biometric') {
+                const biometricToken = await requestBiometricApproval();
+                if (!biometricToken) {
+                    setStatus({ type: 'error', msg: 'Fingerprint approval was cancelled.' });
+                    return;
+                }
+                body.biometricToken = biometricToken;
+            } else {
+                const transactionPin = await requestPin();
+                if (!transactionPin) {
+                    setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
+                    return;
+                }
+                body.transactionPin = transactionPin;
             }
 
             const res = await fetch('/api/purchase', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.id,
-                    serviceType: 'EDUCATION',
-                    amount: totalAmount,
-                    mobileNumber: '', // Not needed for education
-                    serviceID: selectedService.serviceID,
-                    quantity: quantity,
-                    paymentSource,
-                    transactionPin
-                })
+                body: JSON.stringify(body)
             });
 
             const data = await res.json();
@@ -111,10 +121,21 @@ export default function EducationPage() {
             }
 
         } catch (error) {
-            setStatus({ type: 'error', msg: 'Something went wrong.' });
+            const message = error instanceof Error ? error.message : 'Something went wrong.';
+            setStatus({ type: 'error', msg: message });
         } finally {
             setLoading(false);
         }
+    };
+
+    const handlePurchase = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await submitPurchase('pin');
+    };
+
+    const handleBiometricPurchase = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        await submitPurchase('biometric');
     };
 
     return (
@@ -255,13 +276,25 @@ export default function EducationPage() {
                     )}
 
                     {/* Submit Button */}
-                    <button
-                        type="submit"
-                        disabled={loading || !selectedService}
-                        className="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
-                    >
-                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Buy Now'}
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            type="submit"
+                            disabled={loading || !selectedService}
+                            className="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Buy Now'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleBiometricPurchase}
+                            disabled={loading || !selectedService}
+                            className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-green-200 bg-green-50 text-green-600 transition-colors hover:bg-green-100 disabled:opacity-70"
+                            aria-label="Use fingerprint to buy"
+                            title="Use fingerprint to buy"
+                        >
+                            <Fingerprint className="h-5 w-5" />
+                        </button>
+                    </div>
 
                 </form>
             </div>

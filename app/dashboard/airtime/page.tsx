@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Smartphone, Loader2, ArrowLeft } from 'lucide-react';
+import { Smartphone, Loader2, ArrowLeft, Fingerprint } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
@@ -16,7 +16,7 @@ const NETWORKS = [
 ];
 
 export default function AirtimePage() {
-    const { requestPin, PinDialog } = useTransactionPin();
+    const { requestPin, requestBiometricApproval, PinDialog } = useTransactionPin();
     const router = useRouter();
     const [network, setNetwork] = useState(NETWORKS[0]);
     const [amount, setAmount] = useState('');
@@ -42,8 +42,7 @@ export default function AirtimePage() {
 
     const toPay = getDiscountedAmount(amount, network.id);
 
-    const handlePurchase = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const submitPurchase = async (approvalType: 'pin' | 'biometric') => {
         setLoading(true);
         setStatus(null);
 
@@ -54,25 +53,36 @@ export default function AirtimePage() {
                 return;
             }
 
-            const transactionPin = await requestPin();
-            if (!transactionPin) {
-                setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
-                return;
+            const body: Record<string, unknown> = {
+                userId: user.id,
+                serviceType: 'AIRTIME',
+                amount: Number(amount),
+                mobileNumber: phone,
+                serviceID: network.serviceId,
+                network: network.id,
+                paymentSource,
+            };
+
+            if (approvalType === 'biometric') {
+                const biometricToken = await requestBiometricApproval();
+                if (!biometricToken) {
+                    setStatus({ type: 'error', msg: 'Fingerprint approval was cancelled.' });
+                    return;
+                }
+                body.biometricToken = biometricToken;
+            } else {
+                const transactionPin = await requestPin();
+                if (!transactionPin) {
+                    setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
+                    return;
+                }
+                body.transactionPin = transactionPin;
             }
 
             const res = await fetch('/api/purchase', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.id,
-                    serviceType: 'AIRTIME',
-                    amount: Number(amount),
-                    mobileNumber: phone,
-                    serviceID: network.serviceId,
-                    network: network.id,
-                    paymentSource,
-                    transactionPin
-                })
+                body: JSON.stringify(body)
             });
 
             const data = await res.json();
@@ -87,10 +97,21 @@ export default function AirtimePage() {
             }
 
         } catch (error) {
-            setStatus({ type: 'error', msg: 'Something went wrong.' });
+            const message = error instanceof Error ? error.message : 'Something went wrong.';
+            setStatus({ type: 'error', msg: message });
         } finally {
             setLoading(false);
         }
+    };
+
+    const handlePurchase = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await submitPurchase('pin');
+    };
+
+    const handleBiometricPurchase = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        await submitPurchase('biometric');
     };
 
     return (
@@ -194,13 +215,25 @@ export default function AirtimePage() {
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
-                    >
-                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : `Pay ₦${toPay > 0 ? toPay.toFixed(2) : '0.00'}`}
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="flex-1 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : `Pay ₦${toPay > 0 ? toPay.toFixed(2) : '0.00'}`}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleBiometricPurchase}
+                            disabled={loading}
+                            className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-600 transition-colors hover:bg-blue-100 disabled:opacity-70"
+                            aria-label="Use fingerprint to pay"
+                            title="Use fingerprint to pay"
+                        >
+                            <Fingerprint className="h-5 w-5" />
+                        </button>
+                    </div>
                 </form>
             </div>
             {PinDialog}

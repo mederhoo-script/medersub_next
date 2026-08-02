@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Zap, Loader2, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Zap, Loader2, ArrowLeft, CheckCircle2, Fingerprint } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
@@ -16,7 +16,7 @@ const METER_TYPES = [
 ];
 
 export default function ElectricityPage() {
-    const { requestPin, PinDialog } = useTransactionPin();
+    const { requestPin, requestBiometricApproval, PinDialog } = useTransactionPin();
     const router = useRouter();
     const [discos, setDiscos] = useState<any[]>([]);
     const [loadingDiscos, setLoadingDiscos] = useState(true);
@@ -87,8 +87,7 @@ export default function ElectricityPage() {
         }
     };
 
-    const handlePurchase = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const submitPurchase = async (approvalType: 'pin' | 'biometric') => {
         if (!customerName) {
             setStatus({ type: 'error', msg: 'Please validate Meter Number first' });
             return;
@@ -104,26 +103,37 @@ export default function ElectricityPage() {
                 return;
             }
 
-            const transactionPin = await requestPin();
-            if (!transactionPin) {
-                setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
-                return;
+            const body: Record<string, unknown> = {
+                userId: user.id,
+                serviceType: 'ELECTRICITY',
+                amount: Number(amount.replace(/,/g, '')),
+                mobileNumber: meterNum,
+                serviceID: selectedDisco.serviceID,
+                network: selectedDisco.disco,
+                meterType: meterType.id,
+                paymentSource,
+            };
+
+            if (approvalType === 'biometric') {
+                const biometricToken = await requestBiometricApproval();
+                if (!biometricToken) {
+                    setStatus({ type: 'error', msg: 'Fingerprint approval was cancelled.' });
+                    return;
+                }
+                body.biometricToken = biometricToken;
+            } else {
+                const transactionPin = await requestPin();
+                if (!transactionPin) {
+                    setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
+                    return;
+                }
+                body.transactionPin = transactionPin;
             }
 
             const res = await fetch('/api/purchase', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.id,
-                    serviceType: 'ELECTRICITY',
-                    amount: Number(amount.replace(/,/g, '')),
-                    mobileNumber: meterNum, // meterNum acts as mobileNumber
-                    serviceID: selectedDisco.serviceID,
-                    network: selectedDisco.disco, // For tracking name
-                    meterType: meterType.id,
-                    paymentSource,
-                    transactionPin
-                })
+                body: JSON.stringify(body)
             });
 
             const data = await res.json();
@@ -139,10 +149,21 @@ export default function ElectricityPage() {
             }
 
         } catch (error) {
-            setStatus({ type: 'error', msg: 'Something went wrong.' });
+            const message = error instanceof Error ? error.message : 'Something went wrong.';
+            setStatus({ type: 'error', msg: message });
         } finally {
             setLoading(false);
         }
+    };
+
+    const handlePurchase = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await submitPurchase('pin');
+    };
+
+    const handleBiometricPurchase = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        await submitPurchase('biometric');
     };
 
     // Calculate User Cost (Discount applied)
@@ -282,13 +303,25 @@ export default function ElectricityPage() {
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        disabled={loading || !customerName}
-                        className="w-full py-4 bg-yellow-500 text-black rounded-xl font-bold text-lg hover:bg-yellow-400 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
-                    >
-                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Pay Bill'}
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            type="submit"
+                            disabled={loading || !customerName}
+                            className="flex-1 py-4 bg-yellow-500 text-black rounded-xl font-bold text-lg hover:bg-yellow-400 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Pay Bill'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleBiometricPurchase}
+                            disabled={loading || !customerName}
+                            className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-yellow-200 bg-yellow-50 text-yellow-700 transition-colors hover:bg-yellow-100 disabled:opacity-70"
+                            aria-label="Use fingerprint to pay"
+                            title="Use fingerprint to pay"
+                        >
+                            <Fingerprint className="h-5 w-5" />
+                        </button>
+                    </div>
                 </form>
             </div>
             {PinDialog}

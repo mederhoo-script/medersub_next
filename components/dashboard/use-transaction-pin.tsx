@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { approveTransactionWithBiometrics } from '@/components/dashboard/biometric-transaction';
 
 export function useTransactionPin() {
   const [open, setOpen] = useState(false);
@@ -13,6 +14,10 @@ export function useTransactionPin() {
     setOpen(true);
   });
 
+  const requestBiometricApproval = async () => {
+    return await approveTransactionWithBiometrics();
+  };
+
   const close = (value: string | null) => {
     setOpen(false);
     resolvePin?.(value);
@@ -20,7 +25,7 @@ export function useTransactionPin() {
   };
 
   const PinDialog = open ? (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true" aria-labelledby="transaction-pin-title">
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true" aria-labelledby="transaction-pin-title">
       <form
         className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
         onSubmit={(event) => { event.preventDefault(); if (pin.length === 4) close(pin); }}
@@ -49,5 +54,5 @@ export function useTransactionPin() {
     </div>
   ) : null;
 
-  return { requestPin, PinDialog };
+  return { requestPin, requestBiometricApproval, PinDialog };
 }

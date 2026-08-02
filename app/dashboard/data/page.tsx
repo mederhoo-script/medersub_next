@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Wifi, Loader2, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Wifi, Loader2, ArrowLeft, RefreshCw, Fingerprint } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
@@ -19,7 +19,7 @@ const NETWORKS = [
 import { calculateDataProfit } from '@/utils/pricing';
 
 export default function DataPage() {
-    const { requestPin, PinDialog } = useTransactionPin();
+    const { requestPin, requestBiometricApproval, PinDialog } = useTransactionPin();
     // ... (rest of imports and state)
     const router = useRouter();
     const [network, setNetwork] = useState(NETWORKS[0]);
@@ -63,8 +63,7 @@ export default function DataPage() {
         }
     }, [network, allDataPlans]);
 
-    const handlePurchase = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const submitPurchase = async (approvalType: 'pin' | 'biometric') => {
         if (!plan) return;
         setLoading(true);
         setStatus(null);
@@ -76,29 +75,39 @@ export default function DataPage() {
                 return;
             }
 
-            const transactionPin = await requestPin();
-            if (!transactionPin) {
-                setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
-                return;
+            const body: Record<string, unknown> = {
+                userId: user.id,
+                serviceType: 'DATA',
+                amount: Number(plan.amount.toString().replace(/,/g, '')),
+                mobileNumber: phone,
+                serviceID: plan.serviceID,
+                network: network.id,
+                planName: plan.dataPlan,
+                paymentSource,
+            };
+
+            if (approvalType === 'biometric') {
+                const biometricToken = await requestBiometricApproval();
+                if (!biometricToken) {
+                    setStatus({ type: 'error', msg: 'Fingerprint approval was cancelled.' });
+                    return;
+                }
+                body.biometricToken = biometricToken;
+            } else {
+                const transactionPin = await requestPin();
+                if (!transactionPin) {
+                    setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
+                    return;
+                }
+                body.transactionPin = transactionPin;
             }
 
             const res = await fetch('/api/purchase', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.id,
-                    serviceType: 'DATA',
-                    amount: Number(plan.amount.toString().replace(/,/g, '')),
-                    mobileNumber: phone,
-                    serviceID: plan.serviceID,
-                    network: network.id,
-                    planName: plan.dataPlan, // Send planName for markup calculation
-                    paymentSource,
-                    transactionPin
-                })
+                body: JSON.stringify(body)
             });
 
-            // ... (rest of handle logic)
             const data = await res.json();
 
             if (data.error) {
@@ -111,10 +120,21 @@ export default function DataPage() {
             }
 
         } catch (error) {
-            setStatus({ type: 'error', msg: 'Something went wrong.' });
+            const message = error instanceof Error ? error.message : 'Something went wrong.';
+            setStatus({ type: 'error', msg: message });
         } finally {
             setLoading(false);
         }
+    };
+
+    const handlePurchase = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await submitPurchase('pin');
+    };
+
+    const handleBiometricPurchase = async (e: React.MouseEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        await submitPurchase('biometric');
     };
 
     return (
@@ -222,13 +242,25 @@ export default function DataPage() {
                         </div>
                     )}
 
-                    <button
-                        type="submit"
-                        disabled={loading || !plan}
-                        className="w-full py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
-                    >
-                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Buy Now'}
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            type="submit"
+                            disabled={loading || !plan}
+                            className="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+                        >
+                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Buy Now'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleBiometricPurchase}
+                            disabled={loading || !plan}
+                            className="shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border border-green-200 bg-green-50 text-green-600 transition-colors hover:bg-green-100 disabled:opacity-70"
+                            aria-label="Use fingerprint to buy"
+                            title="Use fingerprint to buy"
+                        >
+                            <Fingerprint className="h-5 w-5" />
+                        </button>
+                    </div>
 
                 </form>
             </div>
