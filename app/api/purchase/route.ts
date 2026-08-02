@@ -33,6 +33,14 @@ async function getAuthenticatedUserId() {
     return user.id;
 }
 
+function jsonError(message: string, status: number, extra: Record<string, unknown> = {}) {
+    return NextResponse.json({ ok: false, error: message, ...extra }, { status });
+}
+
+function jsonSuccess(payload: Record<string, unknown>) {
+    return NextResponse.json({ ok: true, ...payload });
+}
+
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -41,27 +49,27 @@ export async function POST(req: Request) {
         const authenticatedUserId = await getAuthenticatedUserId();
 
         if (!authenticatedUserId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return jsonError('Unauthorized', 401);
         }
 
         if (authenticatedUserId !== userId) {
-            return NextResponse.json({ error: 'You can only make purchases from your own account.' }, { status: 403 });
+            return jsonError('You can only make purchases from your own account.', 403);
         }
 
         console.log('Purchase Request:', { userId, serviceType, amount, mobileNumber, planName });
 
         // Validate required fields (mobileNumber not required for EDUCATION)
         if (!userId || !amount || !serviceID) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+            return jsonError('Missing required fields', 400);
         }
 
         if (serviceType !== 'EDUCATION' && !mobileNumber) {
-            return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 });
+            return jsonError('Mobile number is required', 400);
         }
 
         const hasBiometricToken = typeof biometricToken === 'string' && biometricToken.trim().length > 0;
         if (!hasBiometricToken && !TRANSACTION_PIN_PATTERN.test(transactionPin || '')) {
-            return NextResponse.json({ error: 'Enter your 4-digit transaction PIN or approve with biometrics.' }, { status: 400 });
+            return jsonError('Enter your 4-digit transaction PIN or approve with biometrics.', 400);
         }
 
         if (hasBiometricToken) {
@@ -73,11 +81,11 @@ export async function POST(req: Request) {
                 .maybeSingle();
 
             if (approvalError || !approval) {
-                return NextResponse.json({ error: 'Invalid biometric approval.' }, { status: 401 });
+                return jsonError('Invalid biometric approval.', 401);
             }
 
             if (approval.consumed_at || new Date(approval.expires_at) < new Date()) {
-                return NextResponse.json({ error: 'Biometric approval has expired or already been used.' }, { status: 401 });
+                return jsonError('Biometric approval has expired or already been used.', 401);
             }
 
             await supabaseAdmin
@@ -92,19 +100,19 @@ export async function POST(req: Request) {
                 .single();
 
             if (pinProfileError || !pinProfile) {
-                return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
+                return jsonError('User profile not found.', 404);
             }
 
             if (!pinProfile.transaction_pin_hash) {
-                return NextResponse.json({ error: 'Set up your transaction PIN in Account Settings before making purchases.' }, { status: 403 });
+                return jsonError('Set up your transaction PIN in Account Settings before making purchases.', 403);
             }
 
             if (!pinProfile.transaction_pin_changed) {
-                return NextResponse.json({ error: 'Change your default transaction PIN in Account Settings before making purchases.' }, { status: 403 });
+                return jsonError('Change your default transaction PIN in Account Settings before making purchases.', 403);
             }
 
             if (!verifyTransactionPin(transactionPin, pinProfile.transaction_pin_hash)) {
-                return NextResponse.json({ error: 'Invalid transaction PIN.' }, { status: 401 });
+                return jsonError('Invalid transaction PIN.', 401);
             }
         }
 
@@ -118,7 +126,7 @@ export async function POST(req: Request) {
         const generalConfig = (config.general as { maintenance?: boolean; markup?: number | string } | undefined) || {};
 
         if (generalConfig.maintenance) {
-            return NextResponse.json({ error: 'System is currently under maintenance. Please try again later.' }, { status: 503 });
+            return jsonError('System is currently under maintenance. Please try again later.', 503);
         }
 
         // ... existing serviceKey logic ...
@@ -170,7 +178,7 @@ export async function POST(req: Request) {
                 .single();
 
             if (profileError || !profile) {
-                return NextResponse.json({ error: 'User profile not found.' }, { status: 404 });
+                return jsonError('User profile not found.', 404);
             }
 
             const rewardSpendEligibility = getRewardSpendEligibility({
@@ -191,10 +199,7 @@ export async function POST(req: Request) {
                 const requirementMessage = remainingRequirements.length > 0
                     ? `${remainingRequirements.join(' and ')} first.`
                     : 'Complete your Telegram reward stage requirements first.';
-                return NextResponse.json({
-                    error: `Telegram reward spend locked. ${requirementMessage}`,
-                    stage: rewardSpendEligibility,
-                }, { status: 400 });
+                return jsonError(`Telegram reward spend locked. ${requirementMessage}`, 400, { stage: rewardSpendEligibility });
             }
 
             if (profile.telegram_id) {
@@ -207,7 +212,7 @@ export async function POST(req: Request) {
 
                 if (fundingError) {
                     console.error('Failed to load funding transactions for reward spend cap:', fundingError);
-                    return NextResponse.json({ error: 'Unable to verify reward spend cap. Please try again.' }, { status: 500 });
+                    return jsonError('Unable to verify reward spend cap. Please try again.', 500);
                 }
 
                 const { data: rewardSpendTransactions, error: rewardSpendTxError } = await supabaseAdmin
@@ -219,7 +224,7 @@ export async function POST(req: Request) {
 
                 if (rewardSpendTxError) {
                     console.error('Failed to load reward spend transactions for cap check:', rewardSpendTxError);
-                    return NextResponse.json({ error: 'Unable to verify reward spend cap. Please try again.' }, { status: 500 });
+                    return jsonError('Unable to verify reward spend cap. Please try again.', 500);
                 }
 
                 const totalWalletFunding = (fundingTransactions || []).reduce((sum, tx) => sum + Number(tx.charged_amount || 0), 0);
@@ -231,9 +236,7 @@ export async function POST(req: Request) {
                     const nextUnlockedTier = Math.ceil(projectedRewardSpend / 300);
                     const requiredFundingForProjectedSpend = nextUnlockedTier * 500;
                     const additionalFundingNeeded = Math.max(0, requiredFundingForProjectedSpend - totalWalletFunding);
-                    return NextResponse.json({
-                        error: `Reward spend limit reached. You've unlocked ₦${unlockedRewardSpend.toLocaleString()} reward spend from ₦${totalWalletFunding.toLocaleString()} wallet funding. Fund ₦${additionalFundingNeeded.toLocaleString()} more in main wallet to continue.`,
-                    }, { status: 400 });
+                    return jsonError(`Reward spend limit reached. You've unlocked ₦${unlockedRewardSpend.toLocaleString()} reward spend from ₦${totalWalletFunding.toLocaleString()} wallet funding. Fund ₦${additionalFundingNeeded.toLocaleString()} more in main wallet to continue.`, 400);
                 }
             }
 
@@ -246,13 +249,13 @@ export async function POST(req: Request) {
                 .single();
 
             if (walletError || !wallet) {
-                return NextResponse.json({ error: 'User wallet not found.' }, { status: 404 });
+                return jsonError('User wallet not found.', 404);
             }
             currentBalance = Number(wallet.balance);
         }
 
         if (currentBalance < totalCharge) {
-            return NextResponse.json({ error: `Insufficient ${selectedPaymentSource} balance. Required: ₦${totalCharge}` }, { status: 400 });
+            return jsonError(`Insufficient ${selectedPaymentSource} balance. Required: ₦${totalCharge}`, 400);
         }
 
         // 2. Call Inlomax API (Send the actual cost to provider, not the charged amount)
@@ -272,7 +275,7 @@ export async function POST(req: Request) {
             const qty = Number(quantity || 1);
             apiResponse = await inlomax.purchaseEducation(serviceID, qty);
         } else {
-            return NextResponse.json({ error: 'Invalid service type' }, { status: 400 });
+            return jsonError('Invalid service type', 400);
         }
 
         if (apiResponse.status !== 'success') {
@@ -283,7 +286,7 @@ export async function POST(req: Request) {
             if (lowerMsg.includes('insufficient funds') || lowerMsg.includes('insuffucient funds')) {
                 errorMsg = 'Service temporarily unavailable. Please try again later.';
             }
-            return NextResponse.json({ error: errorMsg, debug: apiResponse }, { status: 502 });
+            return jsonError(errorMsg, 502, { debug: apiResponse });
         }
 
         // 3. Deduct Total Charge from selected balance
@@ -344,7 +347,7 @@ export async function POST(req: Request) {
             }
         });
 
-        return NextResponse.json({
+        return jsonSuccess({
             success: true,
             newBalance,
             message: apiResponse.message,
@@ -354,6 +357,6 @@ export async function POST(req: Request) {
     } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Internal Server Error';
         console.error('Purchase API Exception:', err);
-        return NextResponse.json({ error: message }, { status: 500 });
+        return jsonError(message, 500);
     }
 }

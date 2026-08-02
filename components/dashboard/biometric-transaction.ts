@@ -32,13 +32,14 @@ async function ensureBiometricAvailability() {
     throw new Error('Biometrics require a secure connection. Please open the app over HTTPS or localhost.');
   }
 
-  try {
-    const available = await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-    if (!available) {
-      throw new Error('This device or browser has no biometric authenticator available. Set up fingerprint or Face ID in your phone settings first.');
+  // Some browsers and mobile webviews return a false negative for the capability probe
+  // even when biometrics are configured. We should not block the WebAuthn flow here.
+  if (typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function') {
+    try {
+      await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    } catch {
+      // Ignore capability probe failures and continue with the actual authentication attempt.
     }
-  } catch {
-    // Some browsers do not expose the capability check; continue with the WebAuthn flow.
   }
 }
 
