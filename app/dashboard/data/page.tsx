@@ -74,7 +74,7 @@ export default function DataPage() {
                 return;
             }
 
-            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.');
+            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.')?.replace(/\D/g, '').slice(0, 4);
             if (!transactionPin) {
                 setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
                 return;

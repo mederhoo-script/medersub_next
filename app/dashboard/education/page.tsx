@@ -73,7 +73,7 @@ export default function EducationPage() {
             const baseAmount = Number(selectedService.amount.replace(/,/g, ''));
             const totalAmount = baseAmount * quantity;
 
-            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.');
+            const transactionPin = window.prompt('Enter your 4-digit transaction PIN to continue.')?.replace(/\D/g, '').slice(0, 4);
             if (!transactionPin) {
                 setStatus({ type: 'error', msg: 'Transaction PIN is required.' });
                 return;
