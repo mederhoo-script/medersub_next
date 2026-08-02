@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
-import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut } from 'lucide-react'
+import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut, Bell } from 'lucide-react'
 import { enrollTransactionBiometrics } from '@/components/dashboard/biometric-transaction'
+import { disableCurrentNativePushToken, registerNativePushNotifications } from '@/components/dashboard/native-push-notifications'
 
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false })
 
@@ -16,6 +17,13 @@ interface Profile {
   telegram_username: string | null
   telegram_linked_at: string | null
   created_at: string
+}
+
+interface NotificationSettings {
+  pushEnabled: boolean
+  transactionsEnabled: boolean
+  accountEnabled: boolean
+  promosEnabled: boolean
 }
 
 export default function SettingsPage() {
@@ -29,6 +37,13 @@ export default function SettingsPage() {
   const [hasTransactionPin, setHasTransactionPin] = useState(false)
   const [mustChangeTransactionPin, setMustChangeTransactionPin] = useState(false)
   const [unlinkingTelegram, setUnlinkingTelegram] = useState(false)
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    pushEnabled: true,
+    transactionsEnabled: true,
+    accountEnabled: true,
+    promosEnabled: false,
+  })
+  const [savingNotificationSettings, setSavingNotificationSettings] = useState(false)
 
   const [formData, setFormData] = useState({
     email: '',
@@ -77,6 +92,19 @@ export default function SettingsPage() {
           const pinStatus = await pinResponse.json()
           setHasTransactionPin(Boolean(pinStatus.hasTransactionPin))
           setMustChangeTransactionPin(Boolean(pinStatus.mustChangeTransactionPin))
+        }
+
+        const notificationResponse = await fetch('/api/account/notifications', { credentials: 'include' })
+        if (notificationResponse.ok) {
+          const notificationPayload = await notificationResponse.json()
+          if (notificationPayload?.settings) {
+            setNotificationSettings({
+              pushEnabled: notificationPayload.settings.pushEnabled !== false,
+              transactionsEnabled: notificationPayload.settings.transactionsEnabled !== false,
+              accountEnabled: notificationPayload.settings.accountEnabled !== false,
+              promosEnabled: notificationPayload.settings.promosEnabled === true,
+            })
+          }
         }
       } catch (err) {
         setMessage({ type: 'error', text: 'Failed to load profile' })
@@ -157,6 +185,53 @@ export default function SettingsPage() {
       setMessage({ type: 'success', text: 'Fingerprint / Face ID is ready for transaction approval.' })
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message })
+    }
+  }
+
+  const persistNotificationSettings = async (nextSettings: NotificationSettings) => {
+    setSavingNotificationSettings(true)
+    try {
+      const response = await fetch('/api/account/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'update-settings',
+          ...nextSettings,
+        }),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to update notification settings')
+      }
+      setNotificationSettings(nextSettings)
+      setMessage({ type: 'success', text: 'Notification settings updated.' })
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message })
+    } finally {
+      setSavingNotificationSettings(false)
+    }
+  }
+
+  const handleNativeNotificationEnable = async () => {
+    const result = await registerNativePushNotifications()
+    if (!result.ok) {
+      setMessage({ type: 'error', text: result.message || 'Could not enable notifications on this device.' })
+      return
+    }
+    setMessage({ type: 'success', text: 'Notifications enabled on this Android device.' })
+  }
+
+  const handlePushEnabledToggle = async (enabled: boolean) => {
+    const nextSettings = {
+      ...notificationSettings,
+      pushEnabled: enabled,
+    }
+    await persistNotificationSettings(nextSettings)
+    if (!enabled) {
+      await disableCurrentNativePushToken()
+    } else {
+      await handleNativeNotificationEnable()
     }
   }
 
@@ -271,6 +346,82 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
                   <CheckCircle2 className="w-4 h-4" />
                   Active
+                </div>
+
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <div className="flex items-start gap-3">
+                    <Bell className="w-5 h-5 text-emerald-600 mt-1" />
+                    <div className="w-full">
+                      <p className="font-medium text-gray-900">Push Notifications</p>
+                      <p className="text-sm text-gray-600">Receive transaction updates, account alerts, and promotional messages.</p>
+
+                      <div className="mt-4 space-y-3">
+                        <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                          <span>Enable push notifications</span>
+                          <input
+                            type="checkbox"
+                            checked={notificationSettings.pushEnabled}
+                            disabled={savingNotificationSettings}
+                            onChange={(event) => {
+                              void handlePushEnabledToggle(event.target.checked)
+                            }}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                          <span>Transactions</span>
+                          <input
+                            type="checkbox"
+                            checked={notificationSettings.transactionsEnabled}
+                            disabled={savingNotificationSettings || !notificationSettings.pushEnabled}
+                            onChange={(event) => {
+                              const nextSettings = { ...notificationSettings, transactionsEnabled: event.target.checked }
+                              void persistNotificationSettings(nextSettings)
+                            }}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                          <span>Account alerts</span>
+                          <input
+                            type="checkbox"
+                            checked={notificationSettings.accountEnabled}
+                            disabled={savingNotificationSettings || !notificationSettings.pushEnabled}
+                            onChange={(event) => {
+                              const nextSettings = { ...notificationSettings, accountEnabled: event.target.checked }
+                              void persistNotificationSettings(nextSettings)
+                            }}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                          <span>Promotions</span>
+                          <input
+                            type="checkbox"
+                            checked={notificationSettings.promosEnabled}
+                            disabled={savingNotificationSettings || !notificationSettings.pushEnabled}
+                            onChange={(event) => {
+                              const nextSettings = { ...notificationSettings, promosEnabled: event.target.checked }
+                              void persistNotificationSettings(nextSettings)
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleNativeNotificationEnable()
+                          }}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Enable on this device
+                        </button>
+                        <span className="text-xs text-gray-500 self-center">For Android 13+, allow notification permission when prompted.</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

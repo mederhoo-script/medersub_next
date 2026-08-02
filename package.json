@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "build:web": "next build && next export",
+    "build:web": "mkdir -p out && cp public/capacitor-index.html out/index.html",
     "cap:init": "npx cap init medersub com.medersub.app --web-dir=out",
     "cap:add:android": "npx cap add android",
     "cap:sync": "npx cap sync android",
@@ -16,6 +16,7 @@
   "dependencies": {
     "@capacitor/android": "^6.1.0",
     "@capacitor/core": "^6.1.0",
+    "@capacitor/push-notifications": "^6.0.5",
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
     "@supabase/ssr": "^0.8.0",

@@ -2,6 +2,7 @@
 import { ReactNode } from 'react';
 import Sidebar from '@/components/dashboard/sidebar';
 import MobileNav from '@/components/dashboard/mobile-nav';
+import PushNotificationBootstrap from '@/components/dashboard/push-notification-bootstrap';
 
 export default function DashboardLayoutWrapper({ children }: { children: ReactNode }) {
     return (
@@ -18,6 +19,7 @@ export default function DashboardLayoutWrapper({ children }: { children: ReactNo
 
             {/* Mobile Navigation */}
             <MobileNav />
+            <PushNotificationBootstrap />
         </div>
     );
 }
