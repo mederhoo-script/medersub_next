@@ -1,6 +1,8 @@
 'use client';
 
+import { Capacitor } from '@capacitor/core';
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
+import { requestNativeBiometric, isNativeBiometricAvailable } from '@/components/dashboard/native-biometric';
 
 function normalizeBiometricError(error: unknown, fallback: string) {
   if (error instanceof Error) {
@@ -39,9 +41,21 @@ function isEmbeddedBrowser() {
   return /FBAN|FBAV|Instagram|Twitter|Line|WhatsApp|Snapchat|Telegram|TikTok|WeChat|Pinterest/i.test(ua);
 }
 
+function isNativeCapacitorPlatform() {
+  if (typeof window === 'undefined') return false;
+  return Capacitor.isNativePlatform?.() || Capacitor.getPlatform() !== 'web';
+}
+
 export async function checkBiometricSupport() {
   if (typeof window === 'undefined') {
     return { supported: false, message: 'Biometrics are only available in the browser.' };
+  }
+
+  if (isNativeCapacitorPlatform()) {
+    const available = await isNativeBiometricAvailable();
+    return available
+      ? { supported: true }
+      : { supported: false, message: 'Native biometric authentication is not available on this device.' };
   }
 
   if (isEmbeddedBrowser()) {
@@ -100,6 +114,19 @@ export async function enrollTransactionBiometrics() {
 
 export async function approveTransactionWithBiometrics() {
   try {
+    if (isNativeCapacitorPlatform()) {
+      await requestNativeBiometric();
+      const tokenResponse = await fetch('/api/account/biometric', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'purchase-native' }),
+      });
+      const tokenPayload = await tokenResponse.json();
+      if (!tokenResponse.ok) throw new Error(tokenPayload.error || 'Unable to create native biometric approval token.');
+      return tokenPayload.token as string;
+    }
+
     await ensureBiometricAvailability();
     const optionsResponse = await fetch('/api/account/biometric', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action: 'purchase-options' }) });
     const options = await optionsResponse.json();

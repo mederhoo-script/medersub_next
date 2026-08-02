@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MEDERSUB</string>
+    <string name="title_activity_main">MEDERSUB</string>
+    <string name="package_name">com.medersub.app</string>
+    <string name="custom_url_scheme">com.medersub.app</string>
+</resources>

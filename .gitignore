@@ -45,3 +45,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Android native build artifacts
+android/.gradle
+android/app/build
+android/build
+android/**/build
+android/local.properties
+android/app/medersub-release.jks
+keystore.properties
+/.idea

@@ -31,6 +31,11 @@ export async function POST(request: Request) {
       await supabaseAdmin.from('transaction_biometric_challenges').upsert({ user_id: currentUser.id, challenge: options.challenge, purpose: 'enroll', expires_at: expires() });
       return NextResponse.json(options);
     }
+    if (action === 'purchase-native') {
+      const { data: approval, error } = await supabaseAdmin.from('transaction_biometric_approvals').insert({ user_id: currentUser.id, expires_at: expires() }).select('token').single();
+      if (error || !approval) return jsonError('Could not create native biometric approval token.', 500);
+      return NextResponse.json({ token: approval.token });
+    }
     if (action === 'purchase-options') {
       if (!credentials?.length) return jsonError('Set up fingerprint or Face ID in Account Settings first.', 400);
       const options = await generateAuthenticationOptions({ rpID, userVerification: 'required', allowCredentials: credentials.map((c) => ({ id: c.credential_id, transports: c.transports || [] })) });
