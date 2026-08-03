@@ -124,7 +124,7 @@ export default function HistoryPage() {
 
             {selectedReceipt && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true">
-                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                    <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
                         <div className="mb-5 flex items-start justify-between border-b border-gray-100 pb-4">
                             <div>
                                 <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">MEDERSUB Receipt</p>
@@ -136,9 +136,9 @@ export default function HistoryPage() {
                         </div>
                         <div className="space-y-3">
                             {receiptRows(selectedReceipt).map(([label, value]) => (
-                                <div key={label} className="flex justify-between gap-4 border-b border-dashed border-gray-100 pb-2 text-sm">
+                                <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-4 border-b border-dashed border-gray-100 pb-2 text-sm">
                                     <span className="text-gray-500">{label}</span>
-                                    <span className="text-right font-semibold text-gray-900 capitalize">{value}</span>
+                                    <span className="min-w-0 break-words text-right font-semibold text-gray-900 capitalize">{value}</span>
                                 </div>
                             ))}
                         </div>
