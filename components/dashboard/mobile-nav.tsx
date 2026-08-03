@@ -1,9 +1,9 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Settings, History, CreditCard, User, ShieldAlert, LogOut } from 'lucide-react';
+import { Home, Settings, History, CreditCard, User, LogOut } from 'lucide-react';
 import clsx from 'clsx';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const navItems = [
@@ -17,19 +17,7 @@ const navItems = [
 export default function MobileNav() {
     const pathname = usePathname();
     const router = useRouter();
-    const [isAdmin, setIsAdmin] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
-
-    useEffect(() => {
-        const checkRole = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-                if (data?.role === 'ADMIN') setIsAdmin(true);
-            }
-        };
-        checkRole();
-    }, []);
 
     const handleLogout = async () => {
         if (loggingOut) return;
@@ -57,16 +45,6 @@ export default function MobileNav() {
                         </Link>
                     );
                 })}
-
-                {isAdmin && (
-                    <Link
-                        href="/admin"
-                        className="flex flex-col items-center justify-center flex-1 py-1 text-purple-600 min-w-0"
-                    >
-                        <ShieldAlert className="h-5 w-5 mb-1" />
-                        <span className="text-[9px] font-medium">Admin Panel</span>
-                    </Link>
-                )}
 
                 {/* Logout Button */}
                 <button
