@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import type { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
-import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut, Bell } from 'lucide-react'
+import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut, Bell, ShieldAlert } from 'lucide-react'
 import { enrollTransactionBiometrics } from '@/components/dashboard/biometric-transaction'
 import { disableCurrentNativePushToken, registerNativePushNotifications } from '@/components/dashboard/native-push-notifications'
 
@@ -17,6 +19,7 @@ interface Profile {
   telegram_username: string | null
   telegram_linked_at: string | null
   created_at: string
+  role: string | null
 }
 
 interface NotificationSettings {
@@ -29,7 +32,7 @@ interface NotificationSettings {
 export default function SettingsPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
   const [settingPassword, setSettingPassword] = useState(false)
@@ -76,7 +79,7 @@ export default function SettingsPage() {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('id,full_name,telegram_id,telegram_username,telegram_linked_at,created_at')
+          .select('id,full_name,telegram_id,telegram_username,telegram_linked_at,created_at,role')
           .eq('id', user.id)
           .single()
 
@@ -106,7 +109,7 @@ export default function SettingsPage() {
             })
           }
         }
-      } catch (err) {
+      } catch {
         setMessage({ type: 'error', text: 'Failed to load profile' })
       } finally {
         setLoading(false)
@@ -137,8 +140,8 @@ export default function SettingsPage() {
           ? { ...prev, telegram_id: null, telegram_username: null, telegram_linked_at: null }
           : null
       )
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
       setUnlinkingTelegram(false)
     }
@@ -172,8 +175,8 @@ export default function SettingsPage() {
       setPinData({ currentPin: '', pin: '', confirmPin: '' })
       setHasTransactionPin(true)
       setMustChangeTransactionPin(false)
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
       setLoading(false)
     }
@@ -183,8 +186,8 @@ export default function SettingsPage() {
     try {
       await enrollTransactionBiometrics()
       setMessage({ type: 'success', text: 'Fingerprint / Face ID is ready for transaction approval.' })
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     }
   }
 
@@ -206,8 +209,8 @@ export default function SettingsPage() {
       }
       setNotificationSettings(nextSettings)
       setMessage({ type: 'success', text: 'Notification settings updated.' })
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
       setSavingNotificationSettings(false)
     }
@@ -264,8 +267,8 @@ export default function SettingsPage() {
         newPassword: '',
         confirmPassword: '',
       })
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
       setLoading(false)
     }
@@ -295,8 +298,8 @@ export default function SettingsPage() {
       setMessage({ type: 'success', text: 'Profile updated successfully' })
       setProfile((prev) => (prev ? { ...prev, full_name: formData.fullName } : null))
       setEditMode(false)
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
       setLoading(false)
     }
@@ -328,6 +331,26 @@ export default function SettingsPage() {
             <AlertCircle className="w-5 h-5 shrink-0" />
           )}
           <span>{message.text}</span>
+        </div>
+      )}
+
+      {profile?.role?.toUpperCase() === 'ADMIN' && (
+        <div className="rounded-xl border border-purple-100 bg-purple-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="mt-1 h-5 w-5 text-purple-600" />
+              <div>
+                <h2 className="font-semibold text-purple-950">Admin access</h2>
+                <p className="text-sm text-purple-700">Open the admin panel from here if the bottom mobile admin tab is hard to reach.</p>
+              </div>
+            </div>
+            <Link
+              href="/admin"
+              className="inline-flex items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-700"
+            >
+              Open Admin Panel
+            </Link>
+          </div>
         </div>
       )}
 

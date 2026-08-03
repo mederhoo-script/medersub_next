@@ -1,13 +1,25 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Loader2, Search, MoreVertical, Plus, Edit, FileText, X, Trash2 } from 'lucide-react';
+import { Loader2, Search, Edit, FileText, X, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
+type AdminUser = {
+    id: string;
+    email?: string | null;
+    full_name?: string | null;
+    role?: string | null;
+    telegram_id?: string | number | null;
+    telegram_username?: string | null;
+    balance?: number | string | null;
+    created_at: string;
+    is_blocked?: boolean | null;
+};
+
 export default function AdminUsersPage() {
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [editingUser, setEditingUser] = useState<any>(null);
+    const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -28,6 +40,7 @@ export default function AdminUsersPage() {
 
     const handleUpdateUser = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!editingUser) return;
         setSaving(true);
         try {
             const res = await fetch('/api/admin/users', {
@@ -47,14 +60,16 @@ export default function AdminUsersPage() {
             } else {
                 alert('Failed to update user');
             }
-        } catch (error) {
+        } catch {
             alert('Error updating user');
         } finally {
             setSaving(false);
         }
     };
 
-    const handleDeleteUser = async (user: any) => {
+    const getNormalizedRole = (role: string | null | undefined) => String(role || '').toLowerCase();
+
+    const handleDeleteUser = async (user: AdminUser) => {
         if (!confirm(`Are you sure you want to permanently delete user "${user.full_name || user.email}"? This action cannot be undone.`)) return;
         try {
             const res = await fetch('/api/admin/users', {
@@ -68,7 +83,7 @@ export default function AdminUsersPage() {
                 const data = await res.json();
                 alert('Failed to delete user: ' + (data.error || 'Unknown error'));
             }
-        } catch (error) {
+        } catch {
             alert('Error deleting user');
         }
     };
@@ -100,7 +115,7 @@ export default function AdminUsersPage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                         <tr>
@@ -115,13 +130,13 @@ export default function AdminUsersPage() {
                     <tbody className="bg-white divide-y divide-gray-200">
                         {loading ? (
                             <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center">
+                                <td colSpan={6} className="px-6 py-8 text-center">
                                     <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
                                 </td>
                             </tr>
                         ) : filteredUsers.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                                     No users found.
                                 </td>
                             </tr>
@@ -142,7 +157,7 @@ export default function AdminUsersPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getNormalizedRole(user.role) === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
                                             {user.role}
                                         </span>
                                     </td>
@@ -203,6 +218,94 @@ export default function AdminUsersPage() {
                 </table>
             </div>
 
+            <div className="space-y-4 md:hidden">
+                {loading ? (
+                    <div className="flex justify-center rounded-xl border border-gray-200 bg-white py-8 shadow-sm">
+                        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    </div>
+                ) : filteredUsers.length === 0 ? (
+                    <div className="rounded-xl border border-gray-200 bg-white px-4 py-8 text-center text-gray-500 shadow-sm">
+                        No users found.
+                    </div>
+                ) : (
+                    filteredUsers.map((user) => (
+                        <div key={user.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <div className="h-10 w-10 flex-shrink-0 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                                        {user.full_name?.charAt(0) || user.email?.charAt(0)}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold text-gray-900">{user.full_name || 'N/A'}</p>
+                                        <p className="truncate text-xs text-gray-500">{user.email}</p>
+                                    </div>
+                                </div>
+                                <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${getNormalizedRole(user.role) === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
+                                    {String(user.role || 'user').toUpperCase()}
+                                </span>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                                <div>
+                                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Balance</p>
+                                    <p className="font-semibold text-gray-900">₦{user.balance?.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Joined</p>
+                                    <p className="font-semibold text-gray-900">{new Date(user.created_at).toLocaleDateString()}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Telegram</p>
+                                    <p className="truncate font-semibold text-gray-900">{user.telegram_id ? `@${user.telegram_username || user.telegram_id}` : '—'}</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingUser(user)}
+                                    className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                                >
+                                    <Edit className="h-4 w-4" />
+                                    Edit role
+                                </button>
+                                <Link
+                                    href={`/admin/transactions?search=${user.email}`}
+                                    className="flex items-center justify-center gap-2 rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
+                                >
+                                    <FileText className="h-4 w-4" />
+                                    Transactions
+                                </Link>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        const action = user.is_blocked ? 'UNBLOCK' : 'BLOCK';
+                                        if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+                                        try {
+                                            await fetch('/api/admin/users/block', {
+                                                method: 'POST', body: JSON.stringify({ userId: user.id, action })
+                                            });
+                                            fetchUsers();
+                                        } catch (e) { console.error(e); }
+                                    }}
+                                    className={`rounded-lg border px-3 py-2 text-sm font-semibold ${user.is_blocked ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}
+                                >
+                                    {user.is_blocked ? 'Unblock' : 'Block'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeleteUser(user)}
+                                    className="flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
             {/* Edit Modal */}
             {editingUser && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -224,7 +327,7 @@ export default function AdminUsersPage() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Role</label>
                                 <select
-                                    value={editingUser.role}
+                                    value={editingUser.role || 'user'}
                                     onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                                 >
@@ -236,7 +339,7 @@ export default function AdminUsersPage() {
                                 <label className="block text-sm font-medium text-gray-700">Wallet Balance (₦)</label>
                                 <input
                                     type="number"
-                                    value={editingUser.balance}
+                                    value={editingUser.balance ?? ''}
                                     onChange={(e) => setEditingUser({ ...editingUser, balance: e.target.value })}
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                                 />
