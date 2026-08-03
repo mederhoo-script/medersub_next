@@ -50,6 +50,7 @@ export default function AdminTransactionsPage() {
 
     const filteredTx = transactions.filter(tx =>
         tx.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tx.meta?.inlomax_id?.toLowerCase?.().includes(searchTerm.toLowerCase()) ||
         tx.meta?.provider_ref?.toLowerCase?.().includes(searchTerm.toLowerCase()) ||
         tx.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -124,7 +125,7 @@ export default function AdminTransactionsPage() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-xs text-gray-600">
-                                        {tx.meta?.provider_ref || tx.meta?.inlomax_id || 'N/A'}
+                                        {tx.meta?.inlomax_id || tx.meta?.provider_ref || 'N/A'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
                                         {new Date(tx.created_at).toLocaleDateString()}
@@ -182,7 +183,8 @@ export default function AdminTransactionsPage() {
                         <div className="grid gap-3 text-sm">
                             {[
                                 ['Receipt Ref', selectedReceipt.reference || 'N/A'],
-                                ['Inlomax ID', selectedReceipt.meta?.provider_ref || selectedReceipt.meta?.inlomax_id || 'N/A'],
+                                ['Inlomax ID', selectedReceipt.meta?.inlomax_id || 'N/A'],
+                                ['Provider Reference', selectedReceipt.meta?.provider_ref || selectedReceipt.reference || 'N/A'],
                                 ['User', selectedReceipt.profiles?.email || selectedReceipt.user_id || 'Unknown'],
                                 ['Service', (selectedReceipt.meta?.service_type || selectedReceipt.service_type || selectedReceipt.type || 'Transaction').toString().toUpperCase()],
                                 ['Customer / Meter / IUC', selectedReceipt.meta?.mobile || 'N/A'],
