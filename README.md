@@ -271,7 +271,38 @@ npm run dev      # Start development server
 npm run build    # Build for production
 npm run start    # Start production server
 npm run lint     # Run ESLint
+npm run build:web # Build static web bundle for Capacitor
+npm run cap:sync # Sync Capacitor Android project
 ```
+
+### Capacitor Android App (APK)
+
+This repository is configured as a Capacitor wrapper for:
+- `https://medersub.vercel.app`
+
+Build and sync Android assets:
+
+```bash
+npm install
+npm run build:web
+npm run cap:sync
+npm run cap:open:android
+```
+
+In Android Studio:
+- Run on a physical Android device to test native biometrics and push notifications.
+- Build signed APK from **Build > Generate Signed Bundle / APK**.
+
+### Firebase Push Notifications (Android)
+
+1. Create an Android app in Firebase with package name `com.medersub.app`.
+2. Download `google-services.json`.
+3. Place it at:
+   - `android/app/google-services.json`
+4. Re-sync Capacitor and rebuild:
+   - `npm run cap:sync`
+
+The app already includes Android notification permission support, default notification channel metadata, and native push registration hooks.
 
 ### Code Style
 

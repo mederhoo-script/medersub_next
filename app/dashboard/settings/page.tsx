@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import type { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
-import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut } from 'lucide-react'
+import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut, Bell, ShieldAlert } from 'lucide-react'
 import { enrollTransactionBiometrics } from '@/components/dashboard/biometric-transaction'
+import { disableCurrentNativePushToken, registerNativePushNotifications } from '@/components/dashboard/native-push-notifications'
 
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false })
 
@@ -16,12 +19,20 @@ interface Profile {
   telegram_username: string | null
   telegram_linked_at: string | null
   created_at: string
+  role: string | null
+}
+
+interface NotificationSettings {
+  pushEnabled: boolean
+  transactionsEnabled: boolean
+  accountEnabled: boolean
+  promosEnabled: boolean
 }
 
 export default function SettingsPage() {
   const router = useRouter()
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [editMode, setEditMode] = useState(false)
   const [settingPassword, setSettingPassword] = useState(false)
@@ -29,6 +40,13 @@ export default function SettingsPage() {
   const [hasTransactionPin, setHasTransactionPin] = useState(false)
   const [mustChangeTransactionPin, setMustChangeTransactionPin] = useState(false)
   const [unlinkingTelegram, setUnlinkingTelegram] = useState(false)
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
+    pushEnabled: true,
+    transactionsEnabled: true,
+    accountEnabled: true,
+    promosEnabled: false,
+  })
+  const [savingNotificationSettings, setSavingNotificationSettings] = useState(false)
 
   const [formData, setFormData] = useState({
     email: '',
@@ -61,7 +79,7 @@ export default function SettingsPage() {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('id,full_name,telegram_id,telegram_username,telegram_linked_at,created_at')
+          .select('id,full_name,telegram_id,telegram_username,telegram_linked_at,created_at,role')
           .eq('id', user.id)
           .single()
 
@@ -78,7 +96,20 @@ export default function SettingsPage() {
           setHasTransactionPin(Boolean(pinStatus.hasTransactionPin))
           setMustChangeTransactionPin(Boolean(pinStatus.mustChangeTransactionPin))
         }
-      } catch (err) {
+
+        const notificationResponse = await fetch('/api/account/notifications', { credentials: 'include' })
+        if (notificationResponse.ok) {
+          const notificationPayload = await notificationResponse.json()
+          if (notificationPayload?.settings) {
+            setNotificationSettings({
+              pushEnabled: notificationPayload.settings.pushEnabled !== false,
+              transactionsEnabled: notificationPayload.settings.transactionsEnabled !== false,
+              accountEnabled: notificationPayload.settings.accountEnabled !== false,
+              promosEnabled: notificationPayload.settings.promosEnabled === true,
+            })
+          }
+        }
+      } catch {
         setMessage({ type: 'error', text: 'Failed to load profile' })
       } finally {
         setLoading(false)
@@ -109,8 +140,8 @@ export default function SettingsPage() {
           ? { ...prev, telegram_id: null, telegram_username: null, telegram_linked_at: null }
           : null
       )
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
       setUnlinkingTelegram(false)
     }
@@ -144,8 +175,8 @@ export default function SettingsPage() {
       setPinData({ currentPin: '', pin: '', confirmPin: '' })
       setHasTransactionPin(true)
       setMustChangeTransactionPin(false)
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
       setLoading(false)
     }
@@ -155,8 +186,55 @@ export default function SettingsPage() {
     try {
       await enrollTransactionBiometrics()
       setMessage({ type: 'success', text: 'Fingerprint / Face ID is ready for transaction approval.' })
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
+    }
+  }
+
+  const persistNotificationSettings = async (nextSettings: NotificationSettings) => {
+    setSavingNotificationSettings(true)
+    try {
+      const response = await fetch('/api/account/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'update-settings',
+          ...nextSettings,
+        }),
+      })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.error || 'Failed to update notification settings')
+      }
+      setNotificationSettings(nextSettings)
+      setMessage({ type: 'success', text: 'Notification settings updated.' })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
+    } finally {
+      setSavingNotificationSettings(false)
+    }
+  }
+
+  const handleNativeNotificationEnable = async () => {
+    const result = await registerNativePushNotifications()
+    if (!result.ok) {
+      setMessage({ type: 'error', text: result.message || 'Could not enable notifications on this device.' })
+      return
+    }
+    setMessage({ type: 'success', text: 'Notifications enabled on this Android device.' })
+  }
+
+  const handlePushEnabledToggle = async (enabled: boolean) => {
+    const nextSettings = {
+      ...notificationSettings,
+      pushEnabled: enabled,
+    }
+    await persistNotificationSettings(nextSettings)
+    if (!enabled) {
+      await disableCurrentNativePushToken()
+    } else {
+      await handleNativeNotificationEnable()
     }
   }
 
@@ -189,8 +267,8 @@ export default function SettingsPage() {
         newPassword: '',
         confirmPassword: '',
       })
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
       setLoading(false)
     }
@@ -220,8 +298,8 @@ export default function SettingsPage() {
       setMessage({ type: 'success', text: 'Profile updated successfully' })
       setProfile((prev) => (prev ? { ...prev, full_name: formData.fullName } : null))
       setEditMode(false)
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
       setLoading(false)
     }
@@ -256,6 +334,26 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {profile?.role?.toUpperCase() === 'ADMIN' && (
+        <div className="rounded-xl border border-purple-100 bg-purple-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <ShieldAlert className="mt-1 h-5 w-5 text-purple-600" />
+              <div>
+                <h2 className="font-semibold text-purple-950">Admin access</h2>
+                <p className="text-sm text-purple-700">Open the admin panel from here if the bottom mobile admin tab is hard to reach.</p>
+              </div>
+            </div>
+            <Link
+              href="/admin"
+              className="inline-flex items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-700"
+            >
+              Open Admin Panel
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Login Methods */}
       <div className="bg-white rounded-xl border border-gray-100 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Login Methods</h2>
@@ -271,6 +369,82 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-1 text-xs text-green-600 mt-1">
                   <CheckCircle2 className="w-4 h-4" />
                   Active
+                </div>
+
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <div className="flex items-start gap-3">
+                    <Bell className="w-5 h-5 text-emerald-600 mt-1" />
+                    <div className="w-full">
+                      <p className="font-medium text-gray-900">Push Notifications</p>
+                      <p className="text-sm text-gray-600">Receive transaction updates, account alerts, and promotional messages.</p>
+
+                      <div className="mt-4 space-y-3">
+                        <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                          <span>Enable push notifications</span>
+                          <input
+                            type="checkbox"
+                            checked={notificationSettings.pushEnabled}
+                            disabled={savingNotificationSettings}
+                            onChange={(event) => {
+                              void handlePushEnabledToggle(event.target.checked)
+                            }}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                          <span>Transactions</span>
+                          <input
+                            type="checkbox"
+                            checked={notificationSettings.transactionsEnabled}
+                            disabled={savingNotificationSettings || !notificationSettings.pushEnabled}
+                            onChange={(event) => {
+                              const nextSettings = { ...notificationSettings, transactionsEnabled: event.target.checked }
+                              void persistNotificationSettings(nextSettings)
+                            }}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                          <span>Account alerts</span>
+                          <input
+                            type="checkbox"
+                            checked={notificationSettings.accountEnabled}
+                            disabled={savingNotificationSettings || !notificationSettings.pushEnabled}
+                            onChange={(event) => {
+                              const nextSettings = { ...notificationSettings, accountEnabled: event.target.checked }
+                              void persistNotificationSettings(nextSettings)
+                            }}
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-3 text-sm text-gray-700">
+                          <span>Promotions</span>
+                          <input
+                            type="checkbox"
+                            checked={notificationSettings.promosEnabled}
+                            disabled={savingNotificationSettings || !notificationSettings.pushEnabled}
+                            onChange={(event) => {
+                              const nextSettings = { ...notificationSettings, promosEnabled: event.target.checked }
+                              void persistNotificationSettings(nextSettings)
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleNativeNotificationEnable()
+                          }}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Enable on this device
+                        </button>
+                        <span className="text-xs text-gray-500 self-center">For Android 13+, allow notification permission when prompted.</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

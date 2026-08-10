@@ -299,6 +299,7 @@ export async function POST(req: Request) {
                 p_meta: {
                     service_type: serviceType,
                     service_id: serviceID,
+                    inlomax_id: apiResponse.data?.id || null,
                     provider_ref: apiResponse.data?.reference || null,
                     payment_source: 'reward',
                 }
@@ -340,6 +341,7 @@ export async function POST(req: Request) {
                 mobile: mobileNumber,
                 network: network,
                 payment_source: selectedPaymentSource,
+                inlomax_id: apiResponse.data?.id,
                 provider_ref: apiResponse.data?.reference,
                 markup_applied: markupToApply,
                 profit: markupToApply,
