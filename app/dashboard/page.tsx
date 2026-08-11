@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import WalletCard from '@/components/dashboard/wallet-card';
 import ServiceGrid from '@/components/dashboard/service-grid';
 import { supabase } from '@/lib/supabase';
-import { Bell, Smartphone, Wifi, Tv, Zap, GraduationCap, ArrowDownRight } from 'lucide-react';
+import { Bell, Smartphone, Wifi, Tv, Zap, GraduationCap, ArrowDownRight, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 interface Transaction {
@@ -114,6 +114,8 @@ export default function DashboardPage() {
         return serviceType;
     };
 
+    const isRefundTransaction = (transaction: Transaction) => transaction.type === 'refund';
+
     return (
         <div className="space-y-6">
             {/* Header */}
@@ -139,6 +141,13 @@ export default function DashboardPage() {
             {/* Services */}
             <ServiceGrid />
 
+             <div className="mb-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                <p>
+                    Please, don&apos;t send Airtel Awoof and Gifting to any number owing Airtel. It will not deliver and you will not be refunded. Thank you for choosing MEDERSUB.
+                </p>
+            </div>
+
             {/* Recent Activity Mini List */}
             <div className="mt-10">
                 <div className="flex justify-between items-center mb-4">
@@ -159,8 +168,8 @@ export default function DashboardPage() {
                         {transactions.map((transaction) => (
                             <div key={transaction.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                                 <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${getServiceColor(transaction.meta?.service_type)}`}>
-                                        {transaction.type === 'deposit' ? (
+                                    <div className={`p-2 rounded-lg ${isRefundTransaction(transaction) ? 'bg-green-100 text-green-600' : getServiceColor(transaction.meta?.service_type)}`}>
+                                        {transaction.type === 'deposit' || isRefundTransaction(transaction) ? (
                                             <ArrowDownRight className="h-4 w-4" />
                                         ) : (
                                             getServiceIcon(transaction.meta?.service_type)
@@ -168,7 +177,7 @@ export default function DashboardPage() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-medium text-gray-900">
-                                            {transaction.type === 'deposit' ? 'Wallet Funding' : formatServiceName(transaction)}
+                                            {transaction.type === 'deposit' ? 'Wallet Funding' : isRefundTransaction(transaction) ? 'Refund' : formatServiceName(transaction)}
                                         </p>
                                         <p className="text-xs text-gray-500">
                                             {new Date(transaction.created_at).toLocaleDateString('en-US', {
@@ -181,9 +190,9 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className={`text-sm font-semibold ${transaction.type === 'deposit' ? 'text-green-600' : 'text-red-600'
+                                    <p className={`text-sm font-semibold ${transaction.type === 'deposit' || isRefundTransaction(transaction) ? 'text-green-600' : 'text-red-600'
                                         }`}>
-                                        {transaction.type === 'deposit' ? '+' : '-'}₦{(transaction.charged_amount || transaction.amount).toLocaleString()}
+                                        {transaction.type === 'deposit' || isRefundTransaction(transaction) ? '+' : '-'}₦{(transaction.charged_amount || transaction.amount).toLocaleString()}
                                     </p>
                                     <p className={`text-xs ${transaction.status === 'success' ? 'text-green-600' :
                                             transaction.status === 'failed' ? 'text-red-600' : 'text-yellow-600'

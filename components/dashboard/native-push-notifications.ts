@@ -1,7 +1,22 @@
 'use client';
 
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
-import { PushNotifications, type ActionPerformed, type Channel, type PushNotificationSchema, type Token } from '@capacitor/push-notifications';
+import type { ActionPerformed, Channel, PushNotificationSchema, Token } from '@capacitor/push-notifications';
+
+let PushNotifications: typeof import('@capacitor/push-notifications')['PushNotifications'] | null = null;
+
+async function getPushNotifications() {
+  if (PushNotifications) return PushNotifications;
+  try {
+    // Dynamic import so Turbopack/SSR won't attempt to resolve the native module at build time.
+    const mod = await import('@capacitor/push-notifications');
+    PushNotifications = mod.PushNotifications;
+    return PushNotifications;
+  } catch (error) {
+    console.error('Failed to load PushNotifications module:', error);
+    throw error;
+  }
+}
 
 type InitOptions = {
   onAction?: (route: string) => void;
@@ -58,7 +73,8 @@ async function persistPushToken(token: string) {
 }
 
 async function ensureChannels() {
-  await Promise.all(CHANNELS.map((channel) => PushNotifications.createChannel(channel)));
+  const PN = await getPushNotifications();
+  await Promise.all(CHANNELS.map((channel) => PN.createChannel(channel)));
 }
 
 export async function initializeNativePushNotifications(options: InitOptions = {}) {
@@ -68,17 +84,19 @@ export async function initializeNativePushNotifications(options: InitOptions = {
   try {
     await ensureChannels();
 
+    const PN = await getPushNotifications();
+
     listeners = [
-      await PushNotifications.addListener('registration', (token: Token) => {
+      await PN.addListener('registration', (token: Token) => {
         void persistPushToken(token.value);
       }),
-      await PushNotifications.addListener('registrationError', (error) => {
+      await PN.addListener('registrationError', (error) => {
         console.error('Push registration error:', error);
       }),
-      await PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+      await PN.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
         window.dispatchEvent(new CustomEvent('medersub:push-received', { detail: notification }));
       }),
-      await PushNotifications.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
+      await PN.addListener('pushNotificationActionPerformed', (action: ActionPerformed) => {
         window.dispatchEvent(new CustomEvent('medersub:push-opened', { detail: action.notification }));
         const route = extractRouteFromPayload(action);
         if (route && options.onAction) options.onAction(route);
@@ -102,17 +120,17 @@ export async function registerNativePushNotifications() {
   if (!ready) {
     return { ok: false, message: 'Could not initialize push notifications on this device.' };
   }
-
-  let permission = await PushNotifications.checkPermissions();
+  const PN = await getPushNotifications();
+  let permission = await PN.checkPermissions();
   if (permission.receive === 'prompt') {
-    permission = await PushNotifications.requestPermissions();
+    permission = await PN.requestPermissions();
   }
 
   if (permission.receive !== 'granted') {
     return { ok: false, message: 'Notification permission was denied. Enable it in Android settings.' };
   }
 
-  await PushNotifications.register();
+  await PN.register();
   return { ok: true };
 }
 
@@ -121,10 +139,10 @@ export async function registerNativePushIfPermitted() {
 
   const ready = await initializeNativePushNotifications();
   if (!ready) return;
-
-  const permission = await PushNotifications.checkPermissions();
+  const PN = await getPushNotifications();
+  const permission = await PN.checkPermissions();
   if (permission.receive === 'granted') {
-    await PushNotifications.register();
+    await PN.register();
   }
 }
 

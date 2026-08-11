@@ -29,7 +29,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      style={{
+        // Provide default Telegram viewport CSS variables so server-rendered
+        // HTML matches the initial client render and avoids hydration mismatches.
+        ['--tg-viewport-height' as any]: '100vh',
+        ['--tg-viewport-stable-height' as any]: '100vh',
+      } as React.CSSProperties}
+    >
       <head>
         <script src="https://telegram.org/js/telegram-web-app.js"></script>
         {/* <script src="https://5gvci.com/act/files/tag.min.js?z=10718066" data-cfasync="false" async></script>

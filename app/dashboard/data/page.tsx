@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Wifi, Loader2, ArrowLeft, RefreshCw, Fingerprint } from 'lucide-react';
+import { Wifi, Loader2, ArrowLeft, RefreshCw, Fingerprint, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
@@ -146,6 +146,13 @@ export default function DataPage() {
                 </Link>
                 <h1 className="text-xl font-bold text-gray-900">Buy Data Bundle</h1>
                 <h1 className="text-2xl items-right font-bold text-blue-600 tracking-tight">MEDERSUB</h1>
+            </div>
+
+            <div className="mb-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                <p>
+                    Please, don&apos;t send Airtel Awoof and Gifting to any number owing Airtel. It will not deliver and you will not be refunded. Thank you for choosing MEDERSUB.
+                </p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">

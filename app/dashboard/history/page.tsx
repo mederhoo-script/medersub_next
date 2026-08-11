@@ -28,9 +28,17 @@ type ReceiptRow = [string, string];
 
 const formatCurrency = (value: number | string | null | undefined) => `₦${Number(value || 0).toLocaleString()}`;
 
+const isRefundTransaction = (tx: TransactionReceipt) => tx.type === 'refund';
+const getDisplayTitle = (tx: TransactionReceipt) => {
+    if (isRefundTransaction(tx)) return 'Refund';
+    return (tx.meta?.service_type || tx.service_type || tx.type || 'transaction').toString().toUpperCase();
+};
+const getAmountSign = (tx: TransactionReceipt) => (tx.type === 'deposit' || isRefundTransaction(tx) ? '+' : '-');
+const getAmountColorClass = (tx: TransactionReceipt) => (tx.type === 'deposit' || isRefundTransaction(tx) ? 'text-green-600' : 'text-gray-900');
+
 const receiptRows = (tx: TransactionReceipt): ReceiptRow[] => [
     ['Receipt Ref', tx.reference || 'N/A'],
-    ['Service', (tx.meta?.service_type || tx.service_type || tx.type || 'Transaction').toString().toUpperCase()],
+    ['Service', isRefundTransaction(tx) ? 'Refund' : (tx.meta?.service_type || tx.service_type || tx.type || 'Transaction').toString().toUpperCase()],
     ['Status', tx.status || 'pending'],
     ['Amount Paid', formatCurrency(tx.charged_amount || tx.amount)],
     ...(tx.meta?.payment_source ? ([['Payment Source', tx.meta.payment_source]] as ReceiptRow[]) : []),
@@ -84,13 +92,13 @@ export default function HistoryPage() {
                             <div className="flex justify-between items-center">
                                 <div className="flex items-center gap-4">
                                     <div className={clsx("h-10 w-10 rounded-full flex items-center justify-center",
-                                        tx.type === 'deposit' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                                        tx.type === 'deposit' || isRefundTransaction(tx) ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
                                     )}>
-                                        {tx.type === 'deposit' ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
+                                        {tx.type === 'deposit' || isRefundTransaction(tx) ? <ArrowDownLeft className="h-5 w-5" /> : <ArrowUpRight className="h-5 w-5" />}
                                     </div>
                                     <div>
                                         <h4 className="font-semibold text-gray-900 leading-tight">
-                                            {(tx.meta?.service_type || tx.type || 'transaction').toUpperCase()}
+                                            {getDisplayTitle(tx)}
                                         </h4>
                                         <p className="text-xs text-gray-500 mt-1">
                                             {new Date(tx.created_at).toLocaleDateString()} • {new Date(tx.created_at).toLocaleTimeString()}
@@ -98,10 +106,8 @@ export default function HistoryPage() {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <span className={clsx("font-bold block",
-                                        tx.type === 'deposit' ? 'text-green-600' : 'text-gray-900'
-                                    )}>
-                                        {tx.type === 'deposit' ? '+' : '-'}{formatCurrency(tx.charged_amount || tx.amount)}
+                                    <span className={clsx("font-bold block", getAmountColorClass(tx))}>
+                                        {getAmountSign(tx)}{formatCurrency(tx.charged_amount || tx.amount)}
                                     </span>
                                     <span className={clsx("text-xs capitalize px-2 py-0.5 rounded-full inline-block mt-1",
                                         tx.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'

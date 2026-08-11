@@ -33,7 +33,7 @@ export default function RegisterPage() {
             return;
         }
 
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: {
@@ -46,10 +46,28 @@ export default function RegisterPage() {
         if (error) {
             setError(error.message);
             setLoading(false);
-        } else {
-            // Assuming auto-confirm is enabled or nice message
-            router.push('/dashboard');
+            return;
         }
+
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+
+        if (user) {
+            const profileResponse = await fetch('/api/auth/ensure-profile', {
+                method: 'POST',
+                credentials: 'include',
+            });
+
+            if (!profileResponse.ok) {
+                const profilePayload = await profileResponse.json().catch(() => ({}));
+                setError(profilePayload?.error || 'Failed to create user profile.');
+                setLoading(false);
+                return;
+            }
+        }
+
+        router.push('/dashboard');
     };
 
     return (
