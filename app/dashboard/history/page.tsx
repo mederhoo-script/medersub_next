@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Clock, ArrowDownLeft, ArrowUpRight, Receipt, X } from 'lucide-react';
 import Link from 'next/link';
@@ -36,11 +37,24 @@ const getDisplayTitle = (tx: TransactionReceipt) => {
 const getAmountSign = (tx: TransactionReceipt) => (tx.type === 'deposit' || isRefundTransaction(tx) ? '+' : '-');
 const getAmountColorClass = (tx: TransactionReceipt) => (tx.type === 'deposit' || isRefundTransaction(tx) ? 'text-green-600' : 'text-gray-900');
 
+const getTransactionAmount = (tx: TransactionReceipt) => {
+    const charged = Number(tx.charged_amount ?? tx.amount ?? 0);
+    if ((tx.charged_amount === 0 || tx.charged_amount === '0') && tx.amount != null) {
+        return Number(tx.amount);
+    }
+    return charged;
+};
+
+const getReceiptAmountLabel = (tx: TransactionReceipt) => isRefundTransaction(tx) ? 'Amount Refunded' : 'Amount Paid';
+
 const receiptRows = (tx: TransactionReceipt): ReceiptRow[] => [
     ['Receipt Ref', tx.reference || 'N/A'],
+    ...(isRefundTransaction(tx) ? ([
+        ['Original Receipt Ref', tx.meta?.original_reference || tx.meta?.original_tx_id || 'N/A']
+    ] as ReceiptRow[]) : []),
     ['Service', isRefundTransaction(tx) ? 'Refund' : (tx.meta?.service_type || tx.service_type || tx.type || 'Transaction').toString().toUpperCase()],
     ['Status', tx.status || 'pending'],
-    ['Amount Paid', formatCurrency(tx.charged_amount || tx.amount)],
+    [getReceiptAmountLabel(tx), formatCurrency(getTransactionAmount(tx))],
     ...(tx.meta?.payment_source ? ([['Payment Source', tx.meta.payment_source]] as ReceiptRow[]) : []),
     ...(tx.meta?.network ? ([['Network / Provider', tx.meta.network]] as ReceiptRow[]) : []),
     ...(tx.meta?.mobile ? ([['Customer / Meter / IUC', tx.meta.mobile]] as ReceiptRow[]) : []),
@@ -48,6 +62,7 @@ const receiptRows = (tx: TransactionReceipt): ReceiptRow[] => [
 ];
 
 export default function HistoryPage() {
+    const searchParams = useSearchParams();
     const [transactions, setTransactions] = useState<TransactionReceipt[]>([]);
     const [selectedReceipt, setSelectedReceipt] = useState<TransactionReceipt | null>(null);
     const [loading, setLoading] = useState(true);
@@ -67,6 +82,16 @@ export default function HistoryPage() {
         };
         fetchHistory();
     }, []);
+
+    useEffect(() => {
+        const txId = searchParams?.get('txId');
+        if (!txId || transactions.length === 0) return;
+
+        const tx = transactions.find((transaction) => transaction.id === txId);
+        if (tx) {
+            setSelectedReceipt(tx);
+        }
+    }, [searchParams, transactions]);
 
     return (
         <div className="max-w-2xl mx-auto">
@@ -107,7 +132,7 @@ export default function HistoryPage() {
                                 </div>
                                 <div className="text-right">
                                     <span className={clsx("font-bold block", getAmountColorClass(tx))}>
-                                        {getAmountSign(tx)}{formatCurrency(tx.charged_amount || tx.amount)}
+                                        {getAmountSign(tx)}{formatCurrency(getTransactionAmount(tx))}
                                     </span>
                                     <span className={clsx("text-xs capitalize px-2 py-0.5 rounded-full inline-block mt-1",
                                         tx.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
@@ -144,7 +169,7 @@ export default function HistoryPage() {
                             {receiptRows(selectedReceipt).map(([label, value]) => (
                                 <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-4 border-b border-dashed border-gray-100 pb-2 text-sm">
                                     <span className="text-gray-500">{label}</span>
-                                    <span className="min-w-0 break-words text-right font-semibold text-gray-900 capitalize">{value}</span>
+                                    <span className="min-w-0 wrap-break-word text-right font-semibold text-gray-900 capitalize">{value}</span>
                                 </div>
                             ))}
                         </div>

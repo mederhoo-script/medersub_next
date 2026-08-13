@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Loader2, Save } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -41,6 +42,13 @@ export default function SettingsPage() {
     return (
         <div className="max-w-2xl">
             <h1 className="text-2xl font-bold text-gray-900 mb-6">System Settings</h1>
+
+                         <Link
+                                                    href="/dashboard"
+                          className="inline-flex items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-700"
+                        >
+                          Open User Panel
+                        </Link>
 
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                 <form onSubmit={handleSave} className="space-y-6">

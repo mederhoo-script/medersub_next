@@ -9,7 +9,7 @@ import dynamic from 'next/dynamic'
 import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut, Bell, ShieldAlert } from 'lucide-react'
 import { enrollTransactionBiometrics } from '@/components/dashboard/biometric-transaction'
 import { disableCurrentNativePushToken, registerNativePushNotifications } from '@/components/dashboard/native-push-notifications'
-
+    
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false })
 
 interface Profile {
@@ -344,12 +344,18 @@ export default function SettingsPage() {
                 <p className="text-sm text-purple-700">Open the admin panel from here if the bottom mobile admin tab is hard to reach.</p>
               </div>
             </div>
-            <Link
-              href="/admin"
-              className="inline-flex items-center justify-center rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-700"
-            >
-              Open Admin Panel
-            </Link>
+           {/* Admin Link - Only visible to admins */}
+                    {profile?.role?.toUpperCase() === 'ADMIN' && (
+                      <div className="pt-4 mt-4 border-t border-gray-100">
+                        <Link
+                          href="/admin"
+                          className="flex items-center px-4 py-3 text-sm font-medium rounded-xl text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors"
+                        >
+                          <ShieldAlert className="mr-3 h-5 w-5" />
+                          Admin Panel
+                        </Link>
+                      </div>
+                    )}
           </div>
         </div>
       )}

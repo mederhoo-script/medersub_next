@@ -115,6 +115,16 @@ export default function DashboardPage() {
     };
 
     const isRefundTransaction = (transaction: Transaction) => transaction.type === 'refund';
+    const getDisplayTransactionAmount = (transaction: Transaction) => {
+        const chargedAmount = Number(transaction.charged_amount ?? transaction.amount ?? 0);
+        const amountValue = Number(transaction.amount ?? 0);
+        const chargedAmountRaw = Number(transaction.charged_amount ?? NaN);
+
+        if (!Number.isFinite(chargedAmountRaw) || chargedAmountRaw === 0) {
+            return amountValue;
+        }
+        return chargedAmount;
+    };
 
     return (
         <div className="space-y-6">
@@ -165,43 +175,55 @@ export default function DashboardPage() {
                     </div>
                 ) : (
                     <div className="bg-white rounded-xl border border-gray-100 divide-y divide-gray-100">
-                        {transactions.map((transaction) => (
-                            <div key={transaction.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                                <div className="flex items-center gap-3">
-                                    <div className={`p-2 rounded-lg ${isRefundTransaction(transaction) ? 'bg-green-100 text-green-600' : getServiceColor(transaction.meta?.service_type)}`}>
-                                        {transaction.type === 'deposit' || isRefundTransaction(transaction) ? (
-                                            <ArrowDownRight className="h-4 w-4" />
-                                        ) : (
-                                            getServiceIcon(transaction.meta?.service_type)
-                                        )}
+                        {transactions.map((transaction) => {
+                            const content = (
+                                <div className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-lg ${isRefundTransaction(transaction) ? 'bg-green-100 text-green-600' : getServiceColor(transaction.meta?.service_type)}`}>
+                                            {transaction.type === 'deposit' || isRefundTransaction(transaction) ? (
+                                                <ArrowDownRight className="h-4 w-4" />
+                                            ) : (
+                                                getServiceIcon(transaction.meta?.service_type)
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">
+                                                {transaction.type === 'deposit' ? 'Wallet Funding' : isRefundTransaction(transaction) ? 'Refund' : formatServiceName(transaction)}
+                                            </p>
+                                            <p className="text-xs text-gray-500">
+                                                {new Date(transaction.created_at).toLocaleDateString('en-US', {
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900">
-                                            {transaction.type === 'deposit' ? 'Wallet Funding' : isRefundTransaction(transaction) ? 'Refund' : formatServiceName(transaction)}
+                                    <div className="text-right">
+                                        <p className={`text-sm font-semibold ${transaction.type === 'deposit' || isRefundTransaction(transaction) ? 'text-green-600' : 'text-red-600'
+                                            }`}>
+                                            {transaction.type === 'deposit' || isRefundTransaction(transaction) ? '+' : '-'}₦{getDisplayTransactionAmount(transaction).toLocaleString()}
                                         </p>
-                                        <p className="text-xs text-gray-500">
-                                            {new Date(transaction.created_at).toLocaleDateString('en-US', {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
+                                        <p className={`text-xs ${transaction.status === 'success' ? 'text-green-600' :
+                                                transaction.status === 'failed' ? 'text-red-600' : 'text-yellow-600'
+                                            }`}>
+                                            {transaction.status}
                                         </p>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <p className={`text-sm font-semibold ${transaction.type === 'deposit' || isRefundTransaction(transaction) ? 'text-green-600' : 'text-red-600'
-                                        }`}>
-                                        {transaction.type === 'deposit' || isRefundTransaction(transaction) ? '+' : '-'}₦{(transaction.charged_amount || transaction.amount).toLocaleString()}
-                                    </p>
-                                    <p className={`text-xs ${transaction.status === 'success' ? 'text-green-600' :
-                                            transaction.status === 'failed' ? 'text-red-600' : 'text-yellow-600'
-                                        }`}>
-                                        {transaction.status}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
+                            );
+
+                            return isRefundTransaction(transaction) ? (
+                                <Link key={transaction.id} href={`/dashboard/history?txId=${transaction.id}`} className="block">
+                                    {content}
+                                </Link>
+                            ) : (
+                                <Link key={transaction.id} href={`/dashboard/history?txId=${transaction.id}`} className="block">
+                                    {content}
+                                </Link>
+                            );
+                        })}
                     </div>
                 )}
             </div>

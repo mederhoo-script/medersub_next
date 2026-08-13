@@ -1,9 +1,18 @@
+
 'use client';
 
-import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 import type { ActionPerformed, Channel, PushNotificationSchema, Token } from '@capacitor/push-notifications';
 
 let PushNotifications: typeof import('@capacitor/push-notifications')['PushNotifications'] | null = null;
+let CapacitorModule: typeof import('@capacitor/core') | null = null;
+
+async function getCapacitor() {
+  if (CapacitorModule) return CapacitorModule.Capacitor;
+  const mod = await import('@capacitor/core');
+  CapacitorModule = mod;
+  return mod.Capacitor;
+}
 
 async function getPushNotifications() {
   if (PushNotifications) return PushNotifications;
@@ -32,8 +41,13 @@ let initialized = false;
 let listeners: PluginListenerHandle[] = [];
 let latestToken: string | null = null;
 
-function isNativeAndroidPlatform() {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+async function isNativeAndroidPlatform() {
+  try {
+    const Capacitor = await getCapacitor();
+    return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+  } catch {
+    return false;
+  }
 }
 
 function extractRouteFromPayload(action: ActionPerformed): string | null {
@@ -57,6 +71,7 @@ function extractRouteFromPayload(action: ActionPerformed): string | null {
 async function persistPushToken(token: string) {
   latestToken = token;
   try {
+    const Capacitor = await getCapacitor();
     await fetch('/api/account/notifications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -78,7 +93,7 @@ async function ensureChannels() {
 }
 
 export async function initializeNativePushNotifications(options: InitOptions = {}) {
-  if (!isNativeAndroidPlatform()) return false;
+  if (!(await isNativeAndroidPlatform())) return false;
   if (initialized) return true;
 
   try {
@@ -112,7 +127,7 @@ export async function initializeNativePushNotifications(options: InitOptions = {
 }
 
 export async function registerNativePushNotifications() {
-  if (!isNativeAndroidPlatform()) {
+  if (!(await isNativeAndroidPlatform())) {
     return { ok: false, message: 'Native push notifications are available only in the Android app.' };
   }
 
@@ -135,7 +150,7 @@ export async function registerNativePushNotifications() {
 }
 
 export async function registerNativePushIfPermitted() {
-  if (!isNativeAndroidPlatform()) return;
+  if (!(await isNativeAndroidPlatform())) return;
 
   const ready = await initializeNativePushNotifications();
   if (!ready) return;

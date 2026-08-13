@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Loader2, Search, Receipt, X } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -30,6 +30,8 @@ export default function AdminTransactionsPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedReceipt, setSelectedReceipt] = useState<AdminTransaction | null>(null);
+    const [processingRefunds, setProcessingRefunds] = useState<string[]>([]);
+    const processingRefundsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         const fetchTx = async () => {
@@ -124,7 +126,7 @@ export default function AdminTransactionsPage() {
                                             {tx.status}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-xs text-gray-600">
+                                    <td className="px-6 py-4 whitespace-nowrap text-xs font-mono text-gray-600">
                                         {tx.meta?.inlomax_id || tx.meta?.provider_ref || 'N/A'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
@@ -138,26 +140,84 @@ export default function AdminTransactionsPage() {
                                         >
                                             <Receipt className="h-3 w-3" /> Receipt
                                         </button>
-                                        {(tx.status === 'success' || tx.status === 'failed') && tx.type !== 'refund' && tx.type !== 'deposit' && (
+                                        {(tx.status?.toLowerCase() === 'success' || tx.status?.toLowerCase() === 'failed') && tx.type?.toLowerCase() !== 'refund' && tx.type?.toLowerCase() !== 'deposit' && (
                                             <button
+                                                disabled={processingRefundsRef.current.has(tx.id)}
                                                 onClick={async () => {
                                                     if (!confirm('Are you sure you want to refund this transaction?')) return;
+                                                    if (processingRefundsRef.current.has(tx.id)) return;
+                                                    processingRefundsRef.current.add(tx.id);
+                                                    setProcessingRefunds(Array.from(processingRefundsRef.current));
+
                                                     try {
                                                         const res = await fetch('/api/admin/transactions/refund', {
                                                             method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
                                                             body: JSON.stringify({ transactionId: tx.id, reason: 'Admin Manual Refund' })
                                                         });
+                                                        const data = await res.json();
                                                         if (res.ok) {
                                                             alert('Refund Successful');
                                                             window.location.reload();
                                                         } else {
-                                                            alert('Refund Failed');
+                                                            processingRefundsRef.current.delete(tx.id);
+                                                            setProcessingRefunds(Array.from(processingRefundsRef.current));
+                                                            alert(data?.error || 'Refund Failed');
                                                         }
-                                                    } catch { alert('Error processing refund'); }
+                                                    } catch {
+                                                        processingRefundsRef.current.delete(tx.id);
+                                                        setProcessingRefunds(Array.from(processingRefundsRef.current));
+                                                        alert('Error processing refund');
+                                                    }
                                                 }}
-                                                className="text-red-600 hover:text-red-900 bg-red-50 px-3 py-1 rounded-md text-xs"
+                                                className={clsx(
+                                                    'px-3 py-1 rounded-md text-xs',
+                                                    processingRefundsRef.current.has(tx.id)
+                                                        ? 'bg-red-100 text-red-300 cursor-not-allowed'
+                                                        : 'text-red-600 hover:text-red-900 bg-red-50'
+                                                )}
                                             >
                                                 Refund
+                                            </button>
+                                        )}
+                                        {tx.type?.toLowerCase() === 'refund' && (
+                                            <button
+                                                disabled={processingRefundsRef.current.has(tx.id)}
+                                                onClick={async () => {
+                                                    if (!confirm('Delete this refund and charge the amount back to the user?')) return;
+                                                    if (processingRefundsRef.current.has(tx.id)) return;
+                                                    processingRefundsRef.current.add(tx.id);
+                                                    setProcessingRefunds(Array.from(processingRefundsRef.current));
+
+                                                    try {
+                                                        const res = await fetch('/api/admin/transactions/refund', {
+                                                            method: 'DELETE',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ transactionId: tx.id, reason: 'Admin Delete Refund' })
+                                                        });
+                                                        const data = await res.json();
+                                                        if (res.ok) {
+                                                            alert('Refund deleted and amount charged back');
+                                                            window.location.reload();
+                                                        } else {
+                                                            processingRefundsRef.current.delete(tx.id);
+                                                            setProcessingRefunds(Array.from(processingRefundsRef.current));
+                                                            alert(data?.error || 'Failed to delete refund');
+                                                        }
+                                                    } catch {
+                                                        processingRefundsRef.current.delete(tx.id);
+                                                        setProcessingRefunds(Array.from(processingRefundsRef.current));
+                                                        alert('Error deleting refund');
+                                                    }
+                                                }}
+                                                className={clsx(
+                                                    'px-3 py-1 rounded-md text-xs',
+                                                    processingRefundsRef.current.has(tx.id)
+                                                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                                        : 'text-gray-600 hover:text-gray-900 bg-gray-50'
+                                                )}
+                                            >
+                                                Delete
                                             </button>
                                         )}
                                     </td>
@@ -181,10 +241,11 @@ export default function AdminTransactionsPage() {
                             </button>
                         </div>
                         <div className="grid gap-3 text-sm">
-                            {[
+                            {([
                                 ['Receipt Ref', selectedReceipt.reference || 'N/A'],
-                                ['Inlomax ID', selectedReceipt.meta?.inlomax_id || 'N/A'],
-                                ['Provider Reference', selectedReceipt.meta?.provider_ref || selectedReceipt.reference || 'N/A'],
+                                ...(selectedReceipt.type === 'refund' ? [
+                                    ['Original Receipt Ref', selectedReceipt.meta?.original_reference || selectedReceipt.meta?.original_tx_id || 'N/A'],
+                                ] : []),
                                 ['User', selectedReceipt.profiles?.email || selectedReceipt.user_id || 'Unknown'],
                                 ['Service', (selectedReceipt.meta?.service_type || selectedReceipt.service_type || selectedReceipt.type || 'Transaction').toString().toUpperCase()],
                                 ['Customer / Meter / IUC', selectedReceipt.meta?.mobile || 'N/A'],
@@ -194,14 +255,14 @@ export default function AdminTransactionsPage() {
                                 ['Payment Source', selectedReceipt.meta?.payment_source || 'wallet'],
                                 ['Status', selectedReceipt.status || 'pending'],
                                 ['Date', new Date(selectedReceipt.created_at).toLocaleString()],
-                            ].map(([label, value]) => (
+                            ] as [string, string][]).map(([label, value]) => (
                                 <div key={label} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-4 border-b border-dashed border-gray-100 pb-2">
                                     <span className="text-gray-500">{label}</span>
-                                    <span className="min-w-0 break-words text-right font-semibold text-gray-900">{value}</span>
+                                    <span className="min-w-0 wrap-break-word text-right font-semibold text-gray-900">{value}</span>
                                 </div>
                             ))}
                         </div>
-                        <p className="mt-5 rounded-lg bg-amber-50 p-3 text-xs text-amber-700">The Inlomax ID is shown only in the admin receipt so you can trace the transaction with your API provider.</p>
+                        
                     </div>
                 </div>
             )}

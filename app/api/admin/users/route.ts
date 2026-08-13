@@ -5,7 +5,7 @@ export async function GET() {
     try {
         const { data: users, error } = await supabaseAdmin
             .from('profiles')
-            .select('*, wallets(balance)')
+            .select('*, wallets(balance), reward_balance_ngn')
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -14,7 +14,8 @@ export async function GET() {
 
         const formattedUsers = users.map((user: any) => ({
             ...user,
-            balance: user.wallets?.[0]?.balance || 0
+            balance: user.wallets?.[0]?.balance || 0,
+            rewardBalance: Number(user.reward_balance_ngn || 0)
         }));
 
         return NextResponse.json(formattedUsers);
