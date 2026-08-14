@@ -7,29 +7,77 @@ export default function SettingsPage() {
     const [config, setConfig] = useState<any>({ markup: 0, maintenance: false });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [profitData, setProfitData] = useState<any | null>(null);
 
     useEffect(() => {
         const fetchSettings = async () => {
-            const res = await fetch('/api/admin/settings');
-            const data = await res.json();
-            if (data.general) {
-                setConfig(data.general);
+            try {
+                const res = await fetch('/api/admin/settings');
+                const ct = res.headers.get('content-type') || '';
+                if (!res.ok) {
+                    const text = await res.text();
+                    console.error('Settings fetch failed', res.status, text);
+                } else if (ct.includes('application/json')) {
+                    const data = await res.json();
+                    if (data.general) setConfig(data.general);
+                } else {
+                    const text = await res.text();
+                    console.error('Settings returned non-JSON response', text);
+                }
+            } catch (err) {
+                console.error('Failed to fetch settings', err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         fetchSettings();
+
+        const fetchProfits = async () => {
+            try {
+                const r = await fetch('/api/admin/profit');
+                const ct = r.headers.get('content-type') || '';
+                if (!r.ok) {
+                    const text = await r.text();
+                    console.error('Profit fetch failed', r.status, text);
+                    return;
+                }
+                if (ct.includes('application/json')) {
+                    const j = await r.json();
+                    setProfitData(j);
+                } else {
+                    const text = await r.text();
+                    console.error('Profit returned non-JSON response', text);
+                }
+            } catch (e) {
+                console.error('Failed to load profits', e);
+            }
+        };
+        fetchProfits();
     }, []);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
         try {
-            await fetch('/api/admin/settings', {
+            const res = await fetch('/api/admin/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key: 'general', value: config })
             });
-            alert('Settings Saved!');
+            if (!res.ok) {
+                const text = await res.text();
+                console.error('Save settings failed', res.status, text);
+                alert('Failed to save settings');
+            } else {
+                const ct = res.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    const json = await res.json();
+                    if (json?.success) alert('Settings Saved!');
+                    else alert('Settings Saved (unexpected response)');
+                } else {
+                    alert('Settings Saved');
+                }
+            }
         } catch (error) {
             alert('Failed to save settings');
         } finally {
@@ -38,6 +86,9 @@ export default function SettingsPage() {
     };
 
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
+
+    const dailyList = Array.isArray(profitData?.days) ? profitData.days : [];
+    const maxDailyProfit = Math.max(...dailyList.map((entry: any) => Number(entry?.profit || 0)), 0) || 1;
 
     return (
         <div className="max-w-2xl">
@@ -98,6 +149,58 @@ export default function SettingsPage() {
                     </div>
 
                 </form>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700">Profit This Week</h4>
+                    <p className="text-2xl font-semibold text-gray-900 mt-2">{profitData ? (profitData.week?.profit || 0).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }) : '—'}</p>
+                    <p className="text-xs text-gray-500">Transactions: {profitData ? profitData.week?.count ?? 0 : '—'}</p>
+                </div>
+
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700">Profit This Month</h4>
+                    <p className="text-2xl font-semibold text-gray-900 mt-2">{profitData ? (profitData.month?.profit || 0).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }) : '—'}</p>
+                    <p className="text-xs text-gray-500">Transactions: {profitData ? profitData.month?.count ?? 0 : '—'}</p>
+                </div>
+
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700">Profit This Year</h4>
+                    <p className="text-2xl font-semibold text-gray-900 mt-2">{profitData ? (profitData.year?.profit || 0).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }) : '—'}</p>
+                    <p className="text-xs text-gray-500">Transactions: {profitData ? profitData.year?.count ?? 0 : '—'}</p>
+                </div>
+
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700">Profit So Far</h4>
+                    <p className="text-2xl font-semibold text-gray-900 mt-2">{profitData ? (profitData.all?.profit || 0).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }) : '—'}</p>
+                    <p className="text-xs text-gray-500">Transactions: {profitData ? profitData.all?.count ?? 0 : '—'}</p>
+                </div>
+            </div>
+
+            <div className="mt-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-medium text-gray-700">Daily Profit (Last 7 Days)</h4>
+                    <span className="text-xs text-gray-500">{dailyList.length} days</span>
+                </div>
+
+                <div className="space-y-3">
+                    {dailyList.length ? dailyList.map((entry: any) => (
+                        <div key={entry.label} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs text-gray-600">
+                                <span>{entry.label}</span>
+                                <span>{Number(entry.profit || 0).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 })}</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                                <div
+                                    className="h-full rounded-full bg-linear-to-r from-blue-500 to-purple-600"
+                                    style={{ width: `${Math.max((Number(entry.profit || 0) / maxDailyProfit) * 100, 8)}%` }}
+                                />
+                            </div>
+                        </div>
+                    )) : (
+                        <p className="text-sm text-gray-500">No daily profit data yet.</p>
+                    )}
+                </div>
             </div>
         </div>
     );
