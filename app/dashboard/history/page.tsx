@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ArrowLeft, Clock, ArrowDownLeft, ArrowUpRight, Receipt, X } from 'lucide-react';
@@ -61,7 +61,7 @@ const receiptRows = (tx: TransactionReceipt): ReceiptRow[] => [
     ['Date', new Date(tx.created_at).toLocaleString()],
 ];
 
-export default function HistoryPage() {
+function HistoryPageContent() {
     const searchParams = useSearchParams();
     const [transactions, setTransactions] = useState<TransactionReceipt[]>([]);
     const [selectedReceipt, setSelectedReceipt] = useState<TransactionReceipt | null>(null);
@@ -77,6 +77,14 @@ export default function HistoryPage() {
                     .eq('user_id', user.id)
                     .order('created_at', { ascending: false });
                 setTransactions(data || []);
+            }
+
+            export default function HistoryPage() {
+                return (
+                    <Suspense fallback={<div className="max-w-2xl mx-auto py-10 text-center text-gray-400">Loading...</div>}>
+                        <HistoryPageContent />
+                    </Suspense>
+                );
             }
             setLoading(false);
         };
