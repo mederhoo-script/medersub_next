@@ -79,13 +79,6 @@ function HistoryPageContent() {
                 setTransactions(data || []);
             }
 
-            export default function HistoryPage() {
-                return (
-                    <Suspense fallback={<div className="max-w-2xl mx-auto py-10 text-center text-gray-400">Loading...</div>}>
-                        <HistoryPageContent />
-                    </Suspense>
-                );
-            }
             setLoading(false);
         };
         fetchHistory();
@@ -99,6 +92,7 @@ function HistoryPageContent() {
         if (tx) {
             setSelectedReceipt(tx);
         }
+
     }, [searchParams, transactions]);
 
     return (
@@ -186,5 +180,13 @@ function HistoryPageContent() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function HistoryPage() {
+    return (
+        <Suspense fallback={<div className="max-w-2xl mx-auto py-10 text-center text-gray-400">Loading...</div>}>
+            <HistoryPageContent />
+        </Suspense>
     );
 }
