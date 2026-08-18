@@ -57,7 +57,7 @@ export async function korapayFetch<T>(path: string, init: RequestInit = {}): Pro
       headers: {
         Accept: headers.get('Accept'),
         'Content-Type': headers.get('Content-Type'),
-        Authorization: headers.get('Authorization'),
+        Authorization: 'Bearer [redacted]',
       },
       body: bodyText ? JSON.parse(bodyText) : null,
     });

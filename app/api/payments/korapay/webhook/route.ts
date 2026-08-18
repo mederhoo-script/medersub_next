@@ -2,14 +2,6 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getKoraPayCharge, normalizeAmount, normalizeCurrency } from '@/lib/korapay';
 
-function lookupDuplicateTransaction(reference: string) {
-  return supabaseAdmin
-    .from('transactions')
-    .select('*')
-    .eq('reference', reference)
-    .limit(50);
-}
-
 export async function POST(req: Request) {
   const startedAt = Date.now();
   const requestId = crypto.randomUUID();
@@ -39,9 +31,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid webhook payload.' }, { status: 400 });
   }
 
-  log('Payload parsed', { payload: JSON.stringify(payload, null, 2) });
+  log('Payload parsed', {
+    event: payload?.event,
+    reference: payload?.data?.reference,
+    amount: payload?.data?.amount,
+    currency: payload?.data?.currency,
+  });
 
-  if (signature) {
+  if (!signature) {
+    log('Rejected: missing webhook signature');
+    return NextResponse.json({ error: 'Missing webhook signature.' }, { status: 401 });
+  }
+
+  {
     log('Signature found; verifying', {
       signatureLength: signature.trim().length,
       signatureFormat: /^sha256=/i.test(signature.trim()) ? 'sha256-prefixed' : 'raw',
@@ -55,8 +57,6 @@ export async function POST(req: Request) {
     }
 
     log('Signature verified');
-  } else {
-    log('No signature header supplied; continuing without signature verification');
   }
 
   const eventName = payload?.event;
@@ -79,18 +79,6 @@ export async function POST(req: Request) {
   if (!reference) {
     log('Rejected: missing transaction reference');
     return NextResponse.json({ error: 'Missing transaction reference.' }, { status: 400 });
-  }
-
-  log('Checking for duplicate transaction', { reference });
-  const duplicateQuery = await lookupDuplicateTransaction(reference);
-  log('Duplicate transaction check complete', {
-    error: duplicateQuery.error?.message || null,
-    matchCount: duplicateQuery.data?.length || 0,
-  });
-  const duplicate = duplicateQuery.data?.find((entry: any) => entry?.meta?.provider === 'korapay');
-  if (duplicate) {
-    log('Accepted as duplicate; no wallet update', { reference });
-    return NextResponse.json({ ok: true, status: 'duplicate' }, { status: 200 });
   }
 
   const accountReference = chargeData?.virtual_bank_account_details?.virtual_bank_account?.account_reference || null;
@@ -164,61 +152,43 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, status: 'account_mismatch' }, { status: 200 });
     }
 
-    log('Loading wallet balance', { userId: virtualAccount.user_id });
-    const { data: wallet } = await supabaseAdmin
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', virtualAccount.user_id)
-      .maybeSingle();
-
-    const currentBalance = Number(wallet?.balance || 0);
-    const nextBalance = currentBalance + verifiedAmount;
-    log('Wallet balance calculated', { currentBalance, verifiedAmount, nextBalance });
-
-    const walletUpsert = await supabaseAdmin
-      .from('wallets')
-      .upsert(
-        { user_id: virtualAccount.user_id, balance: nextBalance },
-        { onConflict: 'user_id' }
-      );
-
-    if (walletUpsert.error) {
-      log('Failed: wallet update error', { error: walletUpsert.error.message });
-      return NextResponse.json({ error: walletUpsert.error.message }, { status: 500 });
-    }
-
-    log('Wallet updated', { userId: virtualAccount.user_id, newBalance: nextBalance });
-
-    const transactionInsert = await supabaseAdmin.from('transactions').insert({
-      user_id: virtualAccount.user_id,
-      type: 'deposit',
+    log('Atomically recording transaction and crediting wallet', {
+      userId: virtualAccount.user_id,
       amount: verifiedAmount,
-      charged_amount: verifiedAmount,
-      status: 'success',
       reference,
-      meta: {
-        provider: 'korapay',
-        provider_ref: reference,
-        account_reference: accountReference,
-        currency: verifiedCurrency,
-        payment_status: verified.status,
-        source: 'virtual_bank_account',
-        payload: chargeData,
-      },
     });
 
-    if (transactionInsert.error) {
-      log('Failed: transaction insert error', { error: transactionInsert.error.message });
-      return NextResponse.json({ error: transactionInsert.error.message }, { status: 500 });
+    const { data: creditResult, error: creditError } = await supabaseAdmin.rpc(
+      'process_korapay_deposit',
+      {
+        p_user_id: virtualAccount.user_id,
+        p_amount: verifiedAmount,
+        p_reference: reference,
+        p_account_reference: accountReference,
+        p_currency: verifiedCurrency,
+        p_payment_status: verified.status,
+        p_payload: chargeData,
+      }
+    );
+
+    if (creditError) {
+      log('Failed: atomic credit RPC error', { error: creditError.message });
+      return NextResponse.json({ error: creditError.message }, { status: 500 });
+    }
+
+    const result = creditResult as { status?: string; credited?: boolean; balance?: number };
+    if (result.status === 'duplicate') {
+      log('Accepted as duplicate; no wallet update', { reference, balance: result.balance });
+      return NextResponse.json({ ok: true, status: 'duplicate' }, { status: 200 });
     }
 
     log('Webhook completed: wallet credited', {
       reference,
       userId: virtualAccount.user_id,
       amount: verifiedAmount,
-      newBalance: nextBalance,
+      newBalance: result.balance,
     });
-    return NextResponse.json({ ok: true, credited: true, newBalance: nextBalance }, { status: 200 });
+    return NextResponse.json({ ok: true, credited: true, newBalance: result.balance }, { status: 200 });
   } catch (error: any) {
     log('Failed: charge verification or wallet processing threw an exception', {
       error: error?.message || String(error),
