@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getKoraPayCharge, normalizeAmount, normalizeCurrency, verifyKoraPayWebhookSignature } from '@/lib/korapay';
+import { getKoraPayCharge, normalizeAmount, normalizeCurrency } from '@/lib/korapay';
 
 function lookupDuplicateTransaction(reference: string) {
   return supabaseAdmin
@@ -14,15 +14,20 @@ export async function POST(req: Request) {
   const rawBody = await req.text();
   const signature = req.headers.get('x-korapay-signature') || req.headers.get('X-Korapay-Signature');
 
-  if (!verifyKoraPayWebhookSignature(rawBody, signature)) {
-    return NextResponse.json({ error: 'Invalid webhook signature.' }, { status: 401 });
-  }
-
   let payload: any;
   try {
     payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: 'Invalid webhook payload.' }, { status: 400 });
+  }
+
+  if (signature) {
+    const { verifyKoraPayWebhookSignature } = await import('@/lib/korapay');
+    const isValidSignature = verifyKoraPayWebhookSignature(rawBody, signature);
+
+    if (!isValidSignature) {
+      return NextResponse.json({ error: 'Invalid webhook signature.' }, { status: 401 });
+    }
   }
 
   const eventName = payload?.event;
