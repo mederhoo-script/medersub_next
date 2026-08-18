@@ -17,26 +17,23 @@ export function getKoraPayConfig(): KoraPayProviderConfig {
   };
 }
 
-export function verifyKoraPayWebhookSignature(rawBody: string, signature?: string | null) {
-  const secret = getKoraPayConfig().webhookSecret;
+export function verifyKoraPayWebhookSignature(data: unknown, signature?: string | null) {
+  const { secretKey } = getKoraPayConfig();
+  const receivedSignature = String(signature || '').trim();
 
-  if (!secret || !signature) {
+  if (!secretKey || !receivedSignature) {
     return false;
   }
 
-  const expected = crypto
-    .createHmac('sha256', secret)
-    .update(rawBody, 'utf8')
+  const signedData = JSON.stringify(data);
+  const expectedSignature = crypto
+    .createHmac('sha256', secretKey)
+    .update(signedData, 'utf8')
     .digest('hex');
+  const expected = Buffer.from(expectedSignature, 'utf8');
+  const received = Buffer.from(receivedSignature, 'utf8');
 
-  try {
-    return crypto.timingSafeEqual(
-      Buffer.from(expected),
-      Buffer.from(signature)
-    );
-  } catch {
-    return false;
-  }
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
 
 export async function korapayFetch<T>(path: string, init: RequestInit = {}): Promise<T> {

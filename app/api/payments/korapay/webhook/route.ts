@@ -42,9 +42,12 @@ export async function POST(req: Request) {
   log('Payload parsed', { payload: JSON.stringify(payload, null, 2) });
 
   if (signature) {
-    log('Signature found; verifying');
+    log('Signature found; verifying', {
+      signatureLength: signature.trim().length,
+      signatureFormat: /^sha256=/i.test(signature.trim()) ? 'sha256-prefixed' : 'raw',
+    });
     const { verifyKoraPayWebhookSignature } = await import('@/lib/korapay');
-    const isValidSignature = verifyKoraPayWebhookSignature(rawBody, signature);
+    const isValidSignature = verifyKoraPayWebhookSignature(payload?.data, signature);
 
     if (!isValidSignature) {
       log('Rejected: invalid webhook signature');
