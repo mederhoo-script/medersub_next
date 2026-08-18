@@ -5,6 +5,8 @@ create table profiles (
   full_name text,
   role text default 'USER',
   balance numeric default 0,
+  bvn text,
+  nin text,
   telegram_id text,
   telegram_username text,
   telegram_linked_at timestamp with time zone,
@@ -46,9 +48,12 @@ create table transactions (
   user_id uuid references profiles(id) on delete cascade not null,
   type text not null, -- 'DEPOSIT', 'PURCHASE', 'REFUND'
   amount numeric not null,
+  charged_amount numeric,
   service_type text,
   status text default 'PENDING',
   reference text,
+  provider text,
+  provider_ref text,
   meta jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -120,6 +125,25 @@ $$ language plpgsql security definer;
 create trigger on_profile_created
   after insert on public.profiles
   for each row execute procedure public.handle_new_profile();
+
+create table if not exists virtual_accounts (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references profiles(id) on delete cascade not null,
+  provider text not null,
+  account_reference text not null unique,
+  account_number text not null,
+  account_name text not null,
+  bank_name text not null,
+  bank_code text,
+  currency text not null default 'NGN',
+  status text not null default 'active',
+  raw_response jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique (user_id, provider)
+);
+
+create unique index if not exists virtual_accounts_user_provider_unique on virtual_accounts (user_id, provider);
+create index if not exists virtual_accounts_account_reference_idx on virtual_accounts (account_reference);
 
 create or replace function public.get_auth_user_id_by_email(p_email text)
 returns uuid

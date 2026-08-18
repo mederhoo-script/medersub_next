@@ -24,6 +24,7 @@
     "axios": "^1.13.2",
     "capacitor-native-biometric": "^4.2.2",
     "clsx": "^2.1.1",
+    "dotenv": "^17.4.2",
     "es-abstract": "^1.24.1",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.561.0",

@@ -5,6 +5,7 @@ import { Loader2, Save } from 'lucide-react';
 
 export default function SettingsPage() {
     const [config, setConfig] = useState<any>({ markup: 0, maintenance: false });
+    const [activeProvider, setActiveProvider] = useState<'monnify' | 'korapay'>('monnify');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [profitData, setProfitData] = useState<any | null>(null);
@@ -20,6 +21,7 @@ export default function SettingsPage() {
                 } else if (ct.includes('application/json')) {
                     const data = await res.json();
                     if (data.general) setConfig(data.general);
+                    if (data.payment_provider) setActiveProvider(data.payment_provider === 'korapay' ? 'korapay' : 'monnify');
                 } else {
                     const text = await res.text();
                     console.error('Settings returned non-JSON response', text);
@@ -59,11 +61,30 @@ export default function SettingsPage() {
         e.preventDefault();
         setSaving(true);
         try {
-            const res = await fetch('/api/admin/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ key: 'general', value: config })
-            });
+            const [generalRes, providerRes] = await Promise.all([
+                fetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: 'general', value: config })
+                }),
+                fetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: 'payment_provider', value: activeProvider })
+                })
+            ]);
+
+            const failedGeneral = !generalRes.ok;
+            const failedProvider = !providerRes.ok;
+
+            if (failedGeneral || failedProvider) {
+                const text = await Promise.all([generalRes.text().catch(() => ''), providerRes.text().catch(() => '')]);
+                console.error('Save settings failed', text);
+                alert('Failed to save settings');
+                return;
+            }
+
+            const res = generalRes;
             if (!res.ok) {
                 const text = await res.text();
                 console.error('Save settings failed', res.status, text);
@@ -119,6 +140,19 @@ export default function SettingsPage() {
                                 className="pl-8 pr-4 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-500"
                             />
                         </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-100">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Provider</h3>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Active Wallet Funding Provider</label>
+                        <select
+                            value={activeProvider}
+                            onChange={(e) => setActiveProvider(e.target.value as 'monnify' | 'korapay')}
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="monnify">Monnify Virtual Account</option>
+                            <option value="korapay">KoraPay Virtual Account</option>
+                        </select>
                     </div>
 
                     <div className="pt-6 border-t border-gray-100">
