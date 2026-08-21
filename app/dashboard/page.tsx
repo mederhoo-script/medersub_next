@@ -24,6 +24,11 @@ interface ProfileData {
     full_name?: string;
     mainBalance: number;
     rewardBalance: number;
+    virtualAccount?: {
+        account_number: string;
+        bank_name: string;
+        account_name?: string;
+    } | null;
 }
 
 export default function DashboardPage() {
@@ -41,7 +46,7 @@ export default function DashboardPage() {
                 if (user) {
                     const { data, error: profileError } = await supabase
                         .from('profiles')
-                        .select('*, wallets(balance)')
+                        .select('*, wallets(balance), virtual_accounts(account_number,bank_name,account_name,status)')
                         .eq('id', user.id)
                         .single();
 
@@ -50,7 +55,8 @@ export default function DashboardPage() {
                     if (data) {
                         const mainBalance = Number(data.wallets?.[0]?.balance || 0);
                         const rewardBalance = Number(data.reward_balance_ngn || 0);
-                        setProfile({ ...data, mainBalance, rewardBalance });
+                        const virtualAccount = data.virtual_accounts?.find((account: any) => account.status === 'active') || data.virtual_accounts?.[0] || null;
+                        setProfile({ ...data, mainBalance, rewardBalance, virtualAccount });
                     }
                 }
             } finally {
@@ -145,6 +151,7 @@ export default function DashboardPage() {
             <WalletCard
                 mainBalance={profile?.mainBalance || 0}
                 rewardBalance={profile?.rewardBalance || 0}
+                virtualAccount={profile?.virtualAccount}
                 loading={loadingProfile}
             />
 

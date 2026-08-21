@@ -20,6 +20,7 @@ interface Profile {
   telegram_linked_at: string | null
   created_at: string
   role: string | null
+  bvn: string | null
 }
 
 interface NotificationSettings {
@@ -34,7 +35,7 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [editMode, setEditMode] = useState(false)
+  const [editMode, setEditMode] = useState(true)
   const [settingPassword, setSettingPassword] = useState(false)
   const [settingPin, setSettingPin] = useState(false)
   const [hasTransactionPin, setHasTransactionPin] = useState(false)
@@ -51,6 +52,7 @@ export default function SettingsPage() {
   const [formData, setFormData] = useState({
     email: '',
     fullName: '',
+    bvn: '',
   })
 
   const [passwordData, setPasswordData] = useState({
@@ -79,7 +81,7 @@ export default function SettingsPage() {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('id,full_name,telegram_id,telegram_username,telegram_linked_at,created_at,role')
+          .select('id,full_name,telegram_id,telegram_username,telegram_linked_at,created_at,role,bvn')
           .eq('id', user.id)
           .single()
 
@@ -88,13 +90,19 @@ export default function SettingsPage() {
         setFormData({
           email: user.email || '',
           fullName: data?.full_name || '',
+          bvn: data?.bvn || '',
         })
+
+        if (data.bvn) {setEditMode(false)}
 
         const pinResponse = await fetch('/api/account/transaction-pin', { credentials: 'include' })
         if (pinResponse.ok) {
           const pinStatus = await pinResponse.json()
           setHasTransactionPin(Boolean(pinStatus.hasTransactionPin))
           setMustChangeTransactionPin(Boolean(pinStatus.mustChangeTransactionPin))
+          if (hasTransactionPin) {
+          setSettingPin(true)
+        }
         }
 
         const notificationResponse = await fetch('/api/account/notifications', { credentials: 'include' })
@@ -114,10 +122,18 @@ export default function SettingsPage() {
       } finally {
         setLoading(false)
       }
+      
     }
 
     fetchData()
   }, [router])
+
+  useEffect(() => {
+    if (!loading && !hasTransactionPin) {
+      setSettingPin(true)
+    }
+  }, [hasTransactionPin, loading])
+  
 
   const handleUnlinkTelegram = async () => {
     if (!confirm('Unlink Telegram from your account? You can link it again later.')) return
@@ -175,6 +191,10 @@ export default function SettingsPage() {
       setPinData({ currentPin: '', pin: '', confirmPin: '' })
       setHasTransactionPin(true)
       setMustChangeTransactionPin(false)
+
+      if (hasTransactionPin) {
+          setSettingPin(true)
+        }
     } catch (err: unknown) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
     } finally {
@@ -276,6 +296,13 @@ export default function SettingsPage() {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (formData.bvn && (formData.bvn.length !== 11 || /[^0-9]/.test(formData.bvn))) {
+      setMessage({ type: 'error', text: 'Enter a valid 11-digit BVN.' })
+      return
+    }
+
+    const normalizedBvn = formData.bvn.replace(/[^0-9]/g, '')
+    const bvnChanged = normalizedBvn !== (profile?.bvn || '')
     setLoading(true)
 
     try {
@@ -283,10 +310,24 @@ export default function SettingsPage() {
         .from('profiles')
         .update({
           full_name: formData.fullName,
+          bvn: normalizedBvn,
         })
         .eq('id', profile?.id)
 
       if (profileError) throw profileError
+
+      if (bvnChanged && normalizedBvn) {
+        const accountResponse = await fetch('/api/payments/korapay/account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ regenerate: true }),
+        })
+        const accountPayload = await accountResponse.json()
+        if (!accountResponse.ok) {
+          throw new Error(accountPayload.error || 'Your BVN was saved, but we could not generate a new virtual account.')
+        }
+      }
 
       if (formData.email !== user?.email) {
         const { error: emailError } = await supabase.auth.updateUser({
@@ -296,7 +337,7 @@ export default function SettingsPage() {
       }
 
       setMessage({ type: 'success', text: 'Profile updated successfully' })
-      setProfile((prev) => (prev ? { ...prev, full_name: formData.fullName } : null))
+      setProfile((prev) => (prev ? { ...prev, full_name: formData.fullName, bvn: normalizedBvn || null } : null))
       setEditMode(false)
     } catch (err: unknown) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong' })
@@ -363,6 +404,165 @@ export default function SettingsPage() {
       {/* Login Methods */}
       <div className="bg-white rounded-xl border border-gray-100 p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Login Methods</h2>
+
+        {/* Profile Information */}
+      <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-gray-900">Profile Information</h2>
+          {!editMode && (
+            <button
+              onClick={() => setEditMode(true)}
+              className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+            >
+              Edit
+            </button>
+          )}
+        </div>
+
+        {editMode ? (
+          <form onSubmit={handleUpdateProfile} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className='block text-sm font-medium text-gray-700 mb-1'>BVN</label>
+              <input
+                type='text'
+                inputMode='numeric'
+                maxLength={11}
+                value={formData.bvn}
+                onChange={(e) => setFormData({ ...formData, bvn: e.target.value.replace(/[^0-9]/g, '') })}
+                placeholder='Enter your 11-digit BVN'
+                className='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              />
+              <p className='mt-1 text-xs text-gray-500'>Your BVN removes the ₦5,000 daily transfer limit.</p>
+            </div>
+
+            <div className='flex gap-2 pt-4'>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+              >
+                Save Changes
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditMode(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600">Full Name</p>
+              <p className="text-gray-900 font-medium">{profile?.full_name || 'Not set'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Email</p>
+              <p className="text-gray-900 font-medium">{user?.email}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Member Since</p>
+              <p className="text-gray-900 font-medium">
+                {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Transaction PIN Section */}
+        <div className="mb-6 pb-6 border-b border-gray-200">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start gap-3">
+              <Lock className="w-5 h-5 text-purple-600 mt-1" />
+              <div>
+                <p className="font-medium text-gray-900">Transaction PIN</p>
+                <p className="text-sm text-gray-600">Use a 4-digit PIN to approve wallet and reward purchases.</p>
+                <div className={`flex items-center gap-1 text-xs mt-1 ${mustChangeTransactionPin ? 'text-amber-600' : 'text-green-600'}`}>
+                  <CheckCircle2 className="w-4 h-4" />
+                  {mustChangeTransactionPin ? 'Default PIN must be changed before purchases' : hasTransactionPin ? 'Active' : 'Not set'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {!settingPin && (
+            <button
+              onClick={() => setSettingPin(true)}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium ml-8"
+            >
+              {mustChangeTransactionPin ? 'Change Default Transaction PIN' : hasTransactionPin ? 'Change Transaction PIN' : 'Create Transaction PIN'}
+            </button>
+          )}
+
+          {settingPin && (
+            <form onSubmit={handleUpdatePin} className="space-y-4 mt-4 pt-4 border-t border-gray-200 ml-8">
+              {hasTransactionPin && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Current PIN</label>
+                  {mustChangeTransactionPin && <p className="text-xs text-amber-700 mb-1">Your current default PIN is 1234. Choose a new PIN to enable purchases.</p>}
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="\d{4}"
+                    maxLength={4}
+                    value={pinData.currentPin}
+                    onChange={(e) => setPinData({ ...pinData, currentPin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter current 4-digit PIN"
+                    required
+                  />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="\d{4}"
+                  maxLength={4}
+                  value={pinData.pin}
+                  onChange={(e) => setPinData({ ...pinData, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter 4-digit PIN"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  pattern="\d{4}"
+                  maxLength={4}
+                  value={pinData.confirmPin}
+                  onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Confirm 4-digit PIN"
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">Save PIN</button>
+                <button type="button" onClick={() => setSettingPin(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">Cancel</button>
+              </div>
+            </form>
+          )}
+        </div>
 
         {/* Email/Password Section */}
         <div className="mb-6 pb-6 border-b border-gray-200">
@@ -529,85 +729,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Transaction PIN Section */}
-        <div className="mb-6 pb-6 border-b border-gray-200">
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-start gap-3">
-              <Lock className="w-5 h-5 text-purple-600 mt-1" />
-              <div>
-                <p className="font-medium text-gray-900">Transaction PIN</p>
-                <p className="text-sm text-gray-600">Use a 4-digit PIN to approve wallet and reward purchases.</p>
-                <div className={`flex items-center gap-1 text-xs mt-1 ${mustChangeTransactionPin ? 'text-amber-600' : 'text-green-600'}`}>
-                  <CheckCircle2 className="w-4 h-4" />
-                  {mustChangeTransactionPin ? 'Default PIN must be changed before purchases' : hasTransactionPin ? 'Active' : 'Not set'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {!settingPin && (
-            <button
-              onClick={() => setSettingPin(true)}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium ml-8"
-            >
-              {mustChangeTransactionPin ? 'Change Default Transaction PIN' : hasTransactionPin ? 'Change Transaction PIN' : 'Create Transaction PIN'}
-            </button>
-          )}
-
-          {settingPin && (
-            <form onSubmit={handleUpdatePin} className="space-y-4 mt-4 pt-4 border-t border-gray-200 ml-8">
-              {hasTransactionPin && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Current PIN</label>
-                  {mustChangeTransactionPin && <p className="text-xs text-amber-700 mb-1">Your current default PIN is 1234. Choose a new PIN to enable purchases.</p>}
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    pattern="\d{4}"
-                    maxLength={4}
-                    value={pinData.currentPin}
-                    onChange={(e) => setPinData({ ...pinData, currentPin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter current 4-digit PIN"
-                    required
-                  />
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New PIN</label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  pattern="\d{4}"
-                  maxLength={4}
-                  value={pinData.pin}
-                  onChange={(e) => setPinData({ ...pinData, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter 4-digit PIN"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New PIN</label>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  pattern="\d{4}"
-                  maxLength={4}
-                  value={pinData.confirmPin}
-                  onChange={(e) => setPinData({ ...pinData, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Confirm 4-digit PIN"
-                  required
-                />
-              </div>
-              <div className="flex gap-2">
-                <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium">Save PIN</button>
-                <button type="button" onClick={() => setSettingPin(false)} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">Cancel</button>
-              </div>
-            </form>
-          )}
-        </div>
+        
 
         {/* Telegram Section */}
         <div className="flex items-start justify-between">
@@ -651,70 +773,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Profile Information */}
-      <div className="bg-white rounded-xl border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Profile Information</h2>
-          {!editMode && (
-            <button
-              onClick={() => setEditMode(true)}
-              className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-            >
-              Edit
-            </button>
-          )}
-        </div>
-
-        {editMode ? (
-          <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
-              <input
-                type="text"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
-              >
-                Save Changes
-              </button>
-              <button
-                type="button"
-                onClick={() => setEditMode(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <div className="space-y-4">
-            <div>
-              <p className="text-sm text-gray-600">Full Name</p>
-              <p className="text-gray-900 font-medium">{profile?.full_name || 'Not set'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Email</p>
-              <p className="text-gray-900 font-medium">{user?.email}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Member Since</p>
-              <p className="text-gray-900 font-medium">
-                {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      
 
       {/* Logout Button */}
       <button

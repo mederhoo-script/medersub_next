@@ -16,10 +16,11 @@ export default function FundWalletPage() {
     const router = useRouter();
     const [amount, setAmount] = useState('');
     const [loading, setLoading] = useState(false);
-    const [provider, setProvider] = useState<'monnify' | 'korapay'>('monnify');
+    const [provider, setProvider] = useState<'monnify' | 'korapay'>('korapay');
     const [virtualAccount, setVirtualAccount] = useState<any>(null);
     const [accountLoading, setAccountLoading] = useState(false);
     const [koraError, setKoraError] = useState<string>('');
+    const [hasBvn, setHasBvn] = useState(true);
 
     // Config - Should be in ENV used by component or public constant
     const MONNIFY_API_KEY = process.env.NEXT_PUBLIC_MONNIFY_API_KEY || 'MK_TEST_PLACEHOLDER';
@@ -29,8 +30,8 @@ export default function FundWalletPage() {
         const loadProvider = async () => {
             try {
                 const res = await fetch('/api/admin/settings');
-                const data = res.ok ? await res.json() : {};
-                setProvider(data.payment_provider === 'korapay' ? 'korapay' : 'monnify');
+                if (res.ok) await res.json();
+                setProvider('korapay');
             } catch (err) {
                 console.error('Failed to load payment provider', err);
             }
@@ -50,6 +51,7 @@ export default function FundWalletPage() {
                 const data = await res.json();
                 if (res.ok) {
                     setVirtualAccount(data.virtualAccount || null);
+                    setHasBvn(Boolean(data.hasBvn));
                     if (!data.virtualAccount) {
                         const accountRes = await fetch('/api/payments/korapay/account', { method: 'POST' });
                         const accountData = await accountRes.json();
@@ -257,7 +259,16 @@ export default function FundWalletPage() {
             {/* Online Payment Card */}
             {provider === 'korapay' ? (
                 <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                    <h2 className="text-lg font-bold text-gray-900 mb-4">KoraPay Virtual Account</h2>
+                    <h2 className="text-lg font-bold text-gray-900 mb-4">Virtual Account</h2>
+                    {!hasBvn && (
+                        <div className='mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'>
+                            <p className='font-semibold'>Your daily transfer limit is ₦5,000.</p>
+                            <p className='mt-1'>Add your BVN to remove this limit.</p>
+                            <Link href='/dashboard/settings' className='mt-2 inline-flex rounded-md bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-800'>
+                                Add your BVN
+                            </Link>
+                        </div>
+                    )}
                     {accountLoading ? (
                         <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading your virtual account...</div>
                     ) : koraBankDetails ? (
@@ -265,7 +276,7 @@ export default function FundWalletPage() {
                             <div><span className="text-gray-500">Bank:</span> <span className="font-semibold">{koraBankDetails.bankName}</span></div>
                             <div><span className="text-gray-500">Account Name:</span> <span className="font-semibold">{koraBankDetails.accountName}</span></div>
                             <div><span className="text-gray-500">Account Number:</span> <span className="font-semibold text-lg">{koraBankDetails.accountNumber}</span></div>
-                            <div className="text-xs text-amber-700 bg-amber-50 p-3 rounded-lg">Fund this account from your bank app; KoraPay will notify our system and credit your wallet once verified.</div>
+                            <div className="text-xs text-amber-700 bg-amber-50 p-3 rounded-lg">Fund this account from your bank app; and our system will credit your wallet once verified.</div>
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -321,11 +332,11 @@ export default function FundWalletPage() {
                 </div>
             )}
 
-            {/* Manual Transfer Card */}
-            <div className="bg-blue-600 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden">
+            
+            <div className="bg-blue-700 rounded-4xl p-2 text-white shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-blue-500 rounded-full opacity-50 blur-2xl"></div>
                 <div className="relative z-10 text-center">
-                    <p className="text-blue-100 mb-2 font-medium">{provider === 'korapay' ? 'KoraPay Transfer Details' : 'Alternative: Bank Transfer'}</p>
+                    <p className="text-blue-100 mb-2 font-medium">{provider === 'korapay' ? 'Instant Transfer Details' : 'Alternative: Bank Transfer'}</p>
                     <h2 className="text-3xl font-bold mb-1">{(provider === 'korapay' ? koraBankDetails?.accountNumber : BANK_DETAILS.accountNumber) || 'Loading...'}</h2>
                     <p className="text-blue-200 text-sm">{provider === 'korapay' ? koraBankDetails?.bankName : BANK_DETAILS.bankName}</p>
                     <p className="text-blue-200 text-sm mb-6">{provider === 'korapay' ? koraBankDetails?.accountName : BANK_DETAILS.accountName}</p>
@@ -341,9 +352,30 @@ export default function FundWalletPage() {
                 </div>
             </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg text-xs text-gray-500">
+             {/* Manual Transfer Card */}
+            <div className="bg-green-700 rounded-4xl p-2 text-white shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-blue-500 rounded-full opacity-50 blur-2xl"></div>
+                <div className="relative z-10 text-center">
+                    <p className="text-blue-100 mb-2 font-medium">Manual Transfer Details</p>
+                    <h2 className="text-3xl font-bold mb-1">{BANK_DETAILS.accountNumber}</h2>
+                    <p className="text-blue-200 text-sm"> {BANK_DETAILS.bankName}</p>
+                    <p className="text-blue-200 text-sm mb-6"> {BANK_DETAILS.accountName}</p>
+
+                    {((BANK_DETAILS.accountNumber)) && (
+                        <button
+                            onClick={() => copyToClipboard(BANK_DETAILS.accountNumber)}
+                            className="bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/30 text-white px-6 py-2 rounded-full text-sm font-semibold flex items-center gap-2 mx-auto transition-all"
+                        >
+                            <Copy className="h-4 w-4" /> Copy Number
+                        </button>
+                    )}
+                </div>
+                <div className="p-4 text-xs ">
                 Tip: Bank transfers to the above account are manual and may take time. Use the "Instant Funding" option for immediate credit.
             </div>
+            </div>
+
+            
 
         </div>
     );

@@ -54,7 +54,7 @@ async function upsertVirtualAccount(userId: string, payload: Record<string, any>
     throw new Error(lookupError.message);
   }
 
-  if (existing) {
+  if (existing && !payload.force_replace) {
     return existing;
   }
 
@@ -105,19 +105,41 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ virtualAccount: account ?? null });
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('bvn')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('[korapay-account] GET profile lookup failed:', profileError.message);
+      return NextResponse.json({ error: profileError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      virtualAccount: account ?? null,
+      hasBvn: (profile?.bvn?.toString().trim().length || 0) === 11 && !/[^0-9]/.test(profile?.bvn?.toString().trim() || ''),
+    });
   } catch (err: any) {
     console.error('[korapay-account] GET unexpected error:', err?.message || err);
     return NextResponse.json({ error: err.message || 'Failed to fetch virtual account.' }, { status: 500 });
   }
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const { user, error: authError } = await getCurrentUser();
     if (authError || !user) {
       console.error('[korapay-account] POST unauthorized:', authError?.message || 'No user session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let regenerate = false;
+    try {
+      const requestBody = await req.json();
+      regenerate = requestBody?.regenerate === true;
+    } catch {
+      // Empty body: normal account-creation request.
     }
 
     await ensureWalletRow(user.id);
@@ -133,7 +155,7 @@ export async function POST() {
       return NextResponse.json({ error: profileError.message }, { status: 500 });
     }
 
-    const bvn = (profile?.bvn || process.env.KORAPAY_DEFAULT_BVN || '').toString().trim();
+    const bvn = (profile?.bvn || process.env.KORAPAY_DEFAULT_BVN || process.env.BVN || '').toString().trim();
     const nin = (profile?.nin || process.env.KORAPAY_DEFAULT_NIN || '').toString().trim();
     const fullName = getUserProfileName(user, profile) || 'Medersub User';
 
@@ -149,7 +171,7 @@ export async function POST() {
       return NextResponse.json({ error: existing.error.message }, { status: 500 });
     }
 
-    if (existing.data) {
+    if (existing.data && !regenerate) {
       return NextResponse.json({ virtualAccount: existing.data });
     }
 
@@ -189,7 +211,7 @@ export async function POST() {
       kyc,
     };
 
-    console.log('[korapay-account] request payload:', JSON.stringify(body, null, 2));
+    console.log('[korapay-account] creating virtual account', { accountReference, isSandbox, regenerate });
 
     const response = await createKoraPayVirtualAccountWithRetry(body, 3);
     const data = response?.data || {};
@@ -209,6 +231,7 @@ export async function POST() {
       account_status: data.account_status || 'active',
       currency: data.currency || 'NGN',
       raw_response: response,
+      force_replace: regenerate,
     });
 
     return NextResponse.json({ virtualAccount });
