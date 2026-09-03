@@ -372,7 +372,17 @@ export default function FundWalletPage() {
                     )}
                 </div>
                 <div className="p-4 text-xs ">
-                    <p>Tip: Bank transfers to the above account are manual and may take time. Use the "Instant Funding" option for immediate credit.</p>
+                    <p>Tip: Bank transfers to the this account are manual and may take time. Please notify the Admin.</p>
+
+<a
+                        href={`https://wa.me/${MANUAL_PAYMENT_WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hi, I have made a manual transfer to ${BANK_DETAILS.accountNumber}. I am sending my payment screenshot for confirmation.`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-2 rounded-full bg-white/20 px-4 py-2 text-xs font-semibold text-white hover:bg-white/30"
+                    >
+                        <MessageCircle className="h-4 w-4" />
+                        Notify the Admin on WhatsApp
+                    </a>
                     <p className="mt-2 text-green-100">After payment, send a screenshot of your transfer to WhatsApp for confirmation.</p>
                     <a
                         href={`https://wa.me/${MANUAL_PAYMENT_WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hi, I have made a manual transfer to ${BANK_DETAILS.accountNumber}. I am sending my payment screenshot for confirmation.`)}`}
