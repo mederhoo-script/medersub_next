@@ -1,7 +1,7 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Contact, Loader2, ArrowLeft, ChevronRight, Fingerprint, UserRound } from 'lucide-react';
+import { Contact, Loader2, ArrowLeft, ChevronLeft, ChevronRight, Fingerprint, UserRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -74,6 +74,11 @@ export default function DataPage() {
     const [category, setCategory] = useState('');
     const [beneficiaries, setBeneficiaries] = useState<string[]>([]);
     const [beneficiaryOpen, setBeneficiaryOpen] = useState(false);
+    const categoryScrollerRef = useRef<HTMLDivElement>(null);
+
+    const scrollCategories = (direction: 'left' | 'right') => {
+        categoryScrollerRef.current?.scrollBy({ left: direction === 'left' ? -180 : 180, behavior: 'smooth' });
+    };
 
     useEffect(() => {
         fetchServices();
@@ -214,29 +219,29 @@ export default function DataPage() {
     };
 
     return (
-        <div className="mx-auto min-h-screen max-w-md bg-[#f6f7f9] px-4 pb-4">
+        <div className="mx-auto min-h-screen max-w-md bg-[#f6f7f9] px-3 pb-3 sm:px-4 sm:pb-4">
             {/* ... (header and network selection) */}
-            <div className="flex items-center gap-4 mb-6">
-                <Link href="/dashboard" className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <ArrowLeft className="h-5 w-5 text-gray-600" />
+            <div className="mb-5 flex items-center gap-3 sm:mb-6 sm:gap-4">
+                <Link href="/dashboard" className="rounded-full p-1.5 transition-colors hover:bg-gray-100 sm:p-2">
+                    <ArrowLeft className="h-5 w-5 text-gray-600 sm:h-6 sm:w-6" />
                 </Link>
-                <h1 className="flex-1 text-center text-[28px] font-bold tracking-[-0.04em] text-[#111827]">Data</h1>
+                <h1 className="flex-1 text-center text-2xl font-bold text-[#111827] sm:text-[28px]">Data</h1>
             </div>
 
-            <form onSubmit={handlePurchase} className="space-y-7">
+            <form onSubmit={handlePurchase} className="space-y-5 sm:space-y-7">
 
                     <div>
-                        <label className="mb-3 block text-[18px] font-medium text-[#687181]">Phone Number</label>
-                        <div className="relative flex items-center rounded-[22px] border border-[#dfe2e7] bg-white px-5 shadow-[0_2px_5px_rgba(23,31,48,0.03)] focus-within:border-blue-600">
-                            <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="min-w-0 flex-1 py-5 text-[22px] text-[#18202e] outline-none placeholder:text-[#a2a8b2]" placeholder="080 1234 5678" />
-                            <Contact className="h-8 w-8 text-[#0965df]" />
+                        <label className="mb-2 block text-base font-medium text-[#687181] sm:mb-3 sm:text-[18px]">Phone Number</label>
+                        <div className="relative flex items-center rounded-2xl border border-[#dfe2e7] bg-white px-4 shadow-[0_2px_5px_rgba(23,31,48,0.03)] focus-within:border-blue-600 sm:rounded-[22px] sm:px-5">
+                            <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="min-w-0 flex-1 py-4 text-lg text-[#18202e] outline-none placeholder:text-[#a2a8b2] sm:py-5 sm:text-[22px]" placeholder="080 1234 5678" />
+                            <Contact className="h-7 w-7 text-[#0965df] sm:h-8 sm:w-8" />
                         </div>
                     </div>
 
-                    <button type="button" onClick={() => setBeneficiaryOpen((open) => !open)} className="flex w-full items-center gap-4 rounded-[22px] bg-[#f4f5f7] px-7 py-5 text-left text-[18px] text-[#171d2a]">
-                        <UserRound className="h-7 w-7 text-[#0965df]" />
+                    <button type="button" onClick={() => setBeneficiaryOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-2xl bg-[#f4f5f7] px-5 py-4 text-left text-base text-[#171d2a] sm:gap-4 sm:rounded-[22px] sm:px-7 sm:py-5 sm:text-[18px]">
+                        <UserRound className="h-6 w-6 text-[#0965df] sm:h-7 sm:w-7" />
                         <span className="flex-1">{phone && beneficiaries.includes(phone) ? phone : 'Select Beneficiary'}</span>
-                        <ChevronRight className={`h-6 w-6 text-[#687181] transition-transform ${beneficiaryOpen ? 'rotate-90' : ''}`} />
+                        <ChevronRight className={`h-5 w-5 text-[#687181] transition-transform sm:h-6 sm:w-6 ${beneficiaryOpen ? 'rotate-90' : ''}`} />
                     </button>
                     {beneficiaryOpen && (
                         <div className="-mt-4 overflow-hidden rounded-b-[22px] bg-white shadow-sm">
@@ -249,8 +254,8 @@ export default function DataPage() {
                     )}
 
                     <div>
-                        <label className="mb-3 block text-[18px] font-medium text-[#687181]">Select Network</label>
-                        <div className="grid grid-cols-4 gap-3">
+                        <label className="mb-2 block text-base font-medium text-[#687181] sm:mb-3 sm:text-[18px]">Select Network</label>
+                        <div className="grid grid-cols-4 gap-2 sm:gap-3">
                             {networks.map((net) => {
                                 const id = net.toUpperCase();
                                 return (
@@ -258,29 +263,37 @@ export default function DataPage() {
                                     key={net}
                                     type="button"
                                     onClick={() => { setNetwork(id); setPlan(null); }}
-                                    className={`flex min-w-0 flex-col items-center rounded-[21px] border-2 bg-white px-1 py-4 transition-all ${network === id ? 'border-[#0965df]' : 'border-transparent'}`}
+                                    className={`flex min-w-0 flex-col items-center rounded-2xl border-2 bg-white px-1 py-3 transition-all sm:rounded-[21px] sm:py-4 ${network === id ? 'border-[#0965df]' : 'border-transparent'}`}
                                 >
-                                    <div className={`relative mb-2 flex h-12 w-12 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-white ${networkStyles[id] || 'bg-[#64748b]'}`}>
+                                    <div className={`relative mb-1.5 flex h-10 w-10 items-center justify-center overflow-hidden rounded-full text-[9px] font-bold text-white sm:mb-2 sm:h-12 sm:w-12 ${networkStyles[id] || 'bg-[#64748b]'}`}>
                                         {networkLogos[id] ? <Image src={networkLogos[id]} alt={`${displayName(net)} logo`} fill sizes="48px" className="object-contain" /> : id.slice(0, 3)}
                                     </div>
-                                    <span className="truncate text-xs font-semibold text-[#17202e]">{displayName(net)}</span>
+                                    <span className="truncate text-[11px] font-semibold text-[#17202e] sm:text-xs">{displayName(net)}</span>
                                 </button>
                                 );
                             })}
                         </div>
                     </div>
                     <div>
-                        <div className="scrollbar-none flex gap-3 overflow-x-auto pb-2">
-                            {categories.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setPlan(null); }} className={`shrink-0 rounded-full px-7 py-3 text-[16px] font-medium ${category === item ? 'bg-[#0965df] text-white' : 'bg-white text-[#454c58]'}`}>{displayName(item)}</button>)}
+                        <div className="flex items-center gap-1">
+                            <button type="button" onClick={() => scrollCategories('left')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#687181] shadow-sm hover:text-[#0965df]" aria-label="Previous plan categories">
+                                <ChevronLeft className="h-4 w-4" />
+                            </button>
+                            <div ref={categoryScrollerRef} className="scrollbar-none flex min-w-0 gap-2 overflow-x-auto pb-1">
+                                {categories.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setPlan(null); }} className={`shrink-0 rounded-full px-5 py-2 text-sm font-medium sm:px-7 sm:py-3 sm:text-[16px] ${category === item ? 'bg-[#0965df] text-white' : 'bg-white text-[#454c58]'}`}>{displayName(item)}</button>)}
+                            </div>
+                            <button type="button" onClick={() => scrollCategories('right')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#687181] shadow-sm hover:text-[#0965df]" aria-label="Next plan categories">
+                                <ChevronRight className="h-4 w-4" />
+                            </button>
                         </div>
-                        {loadingPlans ? <div className="flex justify-center py-12"><Loader2 className="h-7 w-7 animate-spin text-blue-600" /></div> : <div className="grid grid-cols-2 gap-4">
+                        {loadingPlans ? <div className="flex justify-center py-10"><Loader2 className="h-7 w-7 animate-spin text-blue-600" /></div> : <div className="grid grid-cols-2 gap-3 sm:gap-4">
                             {visiblePlans.map((item) => {
                                 const amount = Number(item.amount.toString().replace(/,/g, '')) + calculateDataProfit(item.dataPlan);
                                 const selected = plan?.serviceID === item.serviceID;
-                                return <button key={item.serviceID} type="button" onClick={() => setPlan(item)} className={`min-h-[165px] rounded-[21px] bg-blue-100 p-3 text-left transition-all ${selected ? 'border-2 border-[#0965df] rounded-[40px] bg-cyan-300' : 'border-2.5 bg-white border-transparent'}`}>
-                                    <span className="block text-[17px] text-[#202632]">{item.validity || 'Flexible'}</span>
-                                    <strong className="mt-7 block text-center text-[20px] font-medium text-[#171d2a]">{item.dataPlan}</strong>
-                                    <span className="mt-6 block text-right text-[17px] font-bold text-[#202632]">₦{amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+                                return <button key={item.serviceID} type="button" onClick={() => setPlan(item)} className={`min-h-[135px] rounded-2xl bg-blue-100 p-3 text-left transition-all sm:min-h-[165px] sm:rounded-[21px] ${selected ? 'border-2 border-[#0965df] bg-cyan-300' : 'border-2.5 border-transparent bg-white'}`}>
+                                    <span className="block text-sm text-[#202632] sm:text-[17px]">{item.validity || 'Flexible'}</span>
+                                    <strong className="mt-5 block text-center text-lg font-medium text-[#171d2a] sm:mt-7 sm:text-[20px]">{item.dataPlan}</strong>
+                                    <span className="mt-4 block text-right text-sm font-bold text-[#202632] sm:mt-6 sm:text-[17px]">₦{amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
                                 </button>;
                             })}
                         </div>}
@@ -288,7 +301,7 @@ export default function DataPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Payment Source</label>
+                        <label className="mb-2 block text-sm font-medium text-gray-700">Payment Source</label>
                         <SpendingBalances paymentSource={paymentSource} />
                         <select
                             value={paymentSource}
@@ -306,11 +319,11 @@ export default function DataPage() {
                         </div>
                     )}
 
-                    <div className="sticky bottom-0 z-10 -mx-4 flex gap-3 bg-[#f6f7f9]/95 px-4 pb-3 pt-2 backdrop-blur-sm">
+                    <div className="sticky bottom-0 z-10 -mx-3 flex gap-2 bg-[#f6f7f9]/95 px-3 pb-2 pt-2 backdrop-blur-sm sm:-mx-4 sm:gap-3 sm:px-4 sm:pb-3">
                         <button
                             type="submit"
                             disabled={loading || !plan}
-                            className="flex-1 rounded-[22px] bg-[#8fb2f4] py-4 text-lg font-bold text-white transition-colors hover:bg-[#78a1ed] disabled:opacity-70 flex items-center justify-center gap-2"
+                            className="flex-1 rounded-2xl bg-[#8fb2f4] py-3 text-base font-bold text-white transition-colors hover:bg-[#78a1ed] disabled:opacity-70 flex items-center justify-center gap-2 sm:rounded-[22px] sm:py-4 sm:text-lg"
                         >
                             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Buy Now'}
                         </button>
@@ -318,7 +331,7 @@ export default function DataPage() {
                             type="button"
                             onClick={handleBiometricPurchase}
                             disabled={loading || !plan || !biometricSupported}
-                            className={`shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl border ${biometricSupported ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100' : 'border-gray-200 bg-gray-100 text-gray-400'} transition-colors disabled:opacity-70`}
+                            className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${biometricSupported ? 'border-blue-200 bg-blue-50 text-blue-600 hover:bg-blue-100' : 'border-gray-200 bg-gray-100 text-gray-400'} transition-colors disabled:opacity-70 sm:h-14 sm:w-14`}
                             aria-label="Use fingerprint to buy"
                             title={biometricSupported ? 'Use fingerprint to buy' : biometricSupportMessage || 'Fingerprint not available'}
                         >

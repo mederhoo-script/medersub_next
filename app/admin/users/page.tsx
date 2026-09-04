@@ -419,64 +419,74 @@ export default function AdminUsersPage() {
                 )}
             </div>
 
-            {/* Edit Modal */}
+            {/* Responsive user editor drawer */}
             {editingUser && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-4 w-full max-w-md shadow-2xl">
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="text-md font-semibold">Edit User</h3>
-                                <button onClick={() => setEditingUser(null)}><X className="h-5 w-5 text-gray-500" /></button>
-                            </div>
-                            <div className="flex gap-4 mb-3 text-sm">
-                                <div>
-                                    <p className="text-xs text-gray-500">Wallet</p>
-                                    <p className="font-semibold">₦{Number(editingUser.balance || 0).toLocaleString()}</p>
+                <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="edit-user-title">
+                    <div className="absolute inset-y-0 right-0 flex w-full max-w-2xl flex-col bg-slate-50 shadow-2xl">
+                            <div className="flex items-start justify-between border-b border-slate-200 bg-white px-5 py-5 sm:px-8">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-lg font-bold text-blue-700">
+                                        {(editingUser.full_name || editingUser.email || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">User editor</p>
+                                        <h3 id="edit-user-title" className="truncate text-xl font-bold text-slate-900">{editingUser.full_name || 'Unnamed user'}</h3>
+                                        <p className="truncate text-sm text-slate-500">{editingUser.email || 'No email address'}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-gray-500">Reward</p>
-                                    <p className="font-semibold">₦{Number((editingUser as any).rewardBalance || 0).toLocaleString()}</p>
+                                <button type="button" aria-label="Close editor" onClick={() => setEditingUser(null)} className="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><X className="h-5 w-5" /></button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
+                                <div className="rounded-2xl bg-blue-50 px-4 py-3">
+                                    <p className="text-xs font-medium text-blue-600">Wallet balance</p>
+                                    <p className="mt-1 text-lg font-bold text-slate-900">₦{Number(editingUser.balance || 0).toLocaleString()}</p>
+                                </div>
+                                <div className="rounded-2xl bg-emerald-50 px-4 py-3">
+                                    <p className="text-xs font-medium text-emerald-600">Reward balance</p>
+                                    <p className="mt-1 text-lg font-bold text-slate-900">₦{Number((editingUser as any).rewardBalance || 0).toLocaleString()}</p>
                                 </div>
                             </div>
-                            <form onSubmit={handleUpdateUser} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+                            <form id="user-profile-form" onSubmit={handleUpdateUser} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">Full Name</label>
                                     <input
                                         type="text"
                                         value={editingUser.full_name || ''}
                                         onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
-                                        className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm"
+                                        className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">Email</label>
-                                    <input type="email" value={editingUser.email || ''} onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                    <input type="email" value={editingUser.email || ''} onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })} className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">Phone / WhatsApp</label>
-                                    <input type="tel" value={editingUser.phone || ''} onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                    <input type="tel" value={editingUser.phone || ''} onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })} className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">BVN</label>
-                                    <input inputMode="numeric" value={editingUser.bvn || ''} onChange={(e) => setEditingUser({ ...editingUser, bvn: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                    <input inputMode="numeric" value={editingUser.bvn || ''} onChange={(e) => setEditingUser({ ...editingUser, bvn: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">NIN</label>
-                                    <input inputMode="numeric" value={editingUser.nin || ''} onChange={(e) => setEditingUser({ ...editingUser, nin: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                    <input inputMode="numeric" value={editingUser.nin || ''} onChange={(e) => setEditingUser({ ...editingUser, nin: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">Telegram ID</label>
-                                    <input value={editingUser.telegram_id || ''} onChange={(e) => setEditingUser({ ...editingUser, telegram_id: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                    <input value={editingUser.telegram_id || ''} onChange={(e) => setEditingUser({ ...editingUser, telegram_id: e.target.value })} className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">Telegram Username</label>
-                                    <input value={editingUser.telegram_username || ''} onChange={(e) => setEditingUser({ ...editingUser, telegram_username: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                    <input value={editingUser.telegram_username || ''} onChange={(e) => setEditingUser({ ...editingUser, telegram_username: e.target.value })} className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">Role</label>
                                     <select
                                         value={editingUser.role || 'user'}
                                         onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
-                                        className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm"
+                                        className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                                     >
                                         <option value="user">USER</option>
                                         <option value="admin">ADMIN</option>
@@ -488,26 +498,20 @@ export default function AdminUsersPage() {
                                         type="number"
                                         value={editingUser.balance ?? ''}
                                         onChange={(e) => setEditingUser({ ...editingUser, balance: e.target.value })}
-                                        className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm"
+                                        className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Override main wallet balance.</p>
-                                </div>
-                                <div className="sm:col-span-2 flex justify-end gap-2">
-                                    <button type="button" onClick={() => setEditingUser(null)} className="px-3 py-1 text-gray-700 hover:bg-gray-100 rounded text-sm">Cancel</button>
-                                    <button type="submit" disabled={saving} className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm disabled:opacity-50">
-                                        {saving ? 'Saving...' : 'Save'}
-                                    </button>
+                                    <p className="mt-1 text-xs text-slate-500">Overrides the main wallet balance.</p>
                                 </div>
                             </form>
-                        <div className="mt-4 border-t pt-3">
+                        <div className="mt-8 border-t border-slate-200 pt-6">
                             <h4 className="text-sm font-medium mb-2">User Earnings</h4>
 
-                            <form onSubmit={handleCreateEarning} className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
-                                <input placeholder="Amount" type="number" value={earningForm.amount} onChange={(e) => setEarningForm({ ...earningForm, amount: e.target.value })} className="col-span-1 sm:col-span-1 border px-2 py-1 rounded text-sm" />
-                                <input placeholder="Reference" value={earningForm.reference} onChange={(e) => setEarningForm({ ...earningForm, reference: e.target.value })} className="col-span-1 sm:col-span-1 border px-2 py-1 rounded text-sm" />
+                            <form onSubmit={handleCreateEarning} className="grid grid-cols-1 gap-2 rounded-2xl border border-slate-200 bg-white p-3 sm:grid-cols-3 sm:items-end">
+                                <input placeholder="Amount" type="number" value={earningForm.amount} onChange={(e) => setEarningForm({ ...earningForm, amount: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
+                                <input placeholder="Reference" value={earningForm.reference} onChange={(e) => setEarningForm({ ...earningForm, reference: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
                                 <div className="col-span-1 sm:col-span-1 flex gap-2">
-                                    <input placeholder="Note" value={earningForm.note} onChange={(e) => setEarningForm({ ...earningForm, note: e.target.value })} className="flex-1 border px-2 py-1 rounded text-sm" />
-                                    <button type="submit" disabled={earningProcessing} className="px-3 py-1 bg-green-600 text-white rounded text-sm">
+                                    <input placeholder="Note" value={earningForm.note} onChange={(e) => setEarningForm({ ...earningForm, note: e.target.value })} className="min-w-0 flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" />
+                                    <button type="submit" disabled={earningProcessing} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                                         {earningProcessing ? '...' : 'Credit'}
                                     </button>
                                 </div>
@@ -535,6 +539,13 @@ export default function AdminUsersPage() {
                                     </ul>
                                 )}
                             </div>
+                        </div>
+                        </div>
+                        <div className="flex gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:px-8">
+                            <button type="button" onClick={() => setEditingUser(null)} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+                            <button type="submit" form="user-profile-form" disabled={saving} className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
+                                {saving ? 'Saving...' : 'Save changes'}
+                            </button>
                         </div>
                     </div>
                 </div>
