@@ -225,20 +225,20 @@ export default function DataPage() {
                 <Link href="/dashboard" className="rounded-full p-1.5 transition-colors hover:bg-gray-100 sm:p-2">
                     <ArrowLeft className="h-5 w-5 text-gray-600 sm:h-6 sm:w-6" />
                 </Link>
-                <h1 className="flex-1 text-center text-2xl font-bold text-[#111827] sm:text-[28px]">Data</h1>
+                <h1 className="flex-1 text-center text-1xl font-bold text-[#111827] sm:text-[28px]">Data</h1>
             </div>
 
             <form onSubmit={handlePurchase} className="space-y-5 sm:space-y-7">
 
                     <div>
-                        <label className="mb-2 block text-base font-medium text-[#687181] sm:mb-3 sm:text-[18px]">Phone Number</label>
+                        <label className="mb-2 block text-sm font-medium text-[#687181] sm:mb-3 sm:text-[18px]">Phone Number</label>
                         <div className="relative flex items-center rounded-2xl border border-[#dfe2e7] bg-white px-4 shadow-[0_2px_5px_rgba(23,31,48,0.03)] focus-within:border-blue-600 sm:rounded-[22px] sm:px-5">
-                            <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="min-w-0 flex-1 py-4 text-lg text-[#18202e] outline-none placeholder:text-[#a2a8b2] sm:py-5 sm:text-[22px]" placeholder="080 1234 5678" />
+                            <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="min-w-0 flex-1 py-4 text-sm text-[#18202e] outline-none placeholder:text-[#a2a8b2] sm:py-5 sm:text-[22px]" placeholder="080 1234 5678" />
                             <Contact className="h-7 w-7 text-[#0965df] sm:h-8 sm:w-8" />
                         </div>
                     </div>
 
-                    <button type="button" onClick={() => setBeneficiaryOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-2xl bg-[#f4f5f7] px-5 py-4 text-left text-base text-[#171d2a] sm:gap-4 sm:rounded-[22px] sm:px-7 sm:py-5 sm:text-[18px]">
+                    <button type="button" onClick={() => setBeneficiaryOpen((open) => !open)} className="flex w-full items-center gap-3 rounded-2xl bg-[#f4f5f7] px-5 py-4 text-left text-sm text-[#171d2a] sm:gap-4 sm:rounded-[22px] sm:px-7 sm:py-5 sm:text-[18px]">
                         <UserRound className="h-6 w-6 text-[#0965df] sm:h-7 sm:w-7" />
                         <span className="flex-1">{phone && beneficiaries.includes(phone) ? phone : 'Select Beneficiary'}</span>
                         <ChevronRight className={`h-5 w-5 text-[#687181] transition-transform sm:h-6 sm:w-6 ${beneficiaryOpen ? 'rotate-90' : ''}`} />
@@ -254,7 +254,7 @@ export default function DataPage() {
                     )}
 
                     <div>
-                        <label className="mb-2 block text-base font-medium text-[#687181] sm:mb-3 sm:text-[18px]">Select Network</label>
+                        <label className="mb-2 block text-sm font-medium text-[#687181] sm:mb-3 sm:text-[18px]">Select Network</label>
                         <div className="grid grid-cols-4 gap-2 sm:gap-3">
                             {networks.map((net) => {
                                 const id = net.toUpperCase();
@@ -279,8 +279,8 @@ export default function DataPage() {
                             <button type="button" onClick={() => scrollCategories('left')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#687181] shadow-sm hover:text-[#0965df]" aria-label="Previous plan categories">
                                 <ChevronLeft className="h-4 w-4" />
                             </button>
-                            <div ref={categoryScrollerRef} className="scrollbar-none flex min-w-0 gap-2 overflow-x-auto pb-1">
-                                {categories.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setPlan(null); }} className={`shrink-0 rounded-full px-5 py-2 text-sm font-medium sm:px-7 sm:py-3 sm:text-[16px] ${category === item ? 'bg-[#0965df] text-white' : 'bg-white text-[#454c58]'}`}>{displayName(item)}</button>)}
+                            <div ref={categoryScrollerRef} className="scrollbar-none flex min-w-0 gap-2 overflow-x-auto pb-4">
+                                {categories.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setPlan(null); }} className={`shrink-0 rounded-full px-5 py-2 text-xs font-medium sm:px-7 sm:py-3 sm:text-[16px] ${category === item ? 'bg-[#0965df] text-white' : 'bg-white text-[#454c58]'}`}>{displayName(item)}</button>)}
                             </div>
                             <button type="button" onClick={() => scrollCategories('right')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#687181] shadow-sm hover:text-[#0965df]" aria-label="Next plan categories">
                                 <ChevronRight className="h-4 w-4" />
