@@ -7,6 +7,7 @@ create table profiles (
   balance numeric default 0,
   bvn text,
   nin text,
+  phone text,
   telegram_id text,
   telegram_username text,
   telegram_linked_at timestamp with time zone,
@@ -73,6 +74,7 @@ begin
       email,
       full_name,
       role,
+      phone,
       telegram_id,
       telegram_username,
       telegram_linked_at
@@ -82,6 +84,7 @@ begin
       new.email,
       new.raw_user_meta_data->>'full_name',
       'USER',
+      nullif(new.raw_user_meta_data->>'phone', ''),
       nullif(new.raw_user_meta_data->>'telegram_id', ''),
       nullif(new.raw_user_meta_data->>'telegram_username', ''),
       case

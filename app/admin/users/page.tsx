@@ -7,9 +7,13 @@ type AdminUser = {
     id: string;
     email?: string | null;
     full_name?: string | null;
+    phone?: string | null;
+    bvn?: string | null;
+    nin?: string | null;
     role?: string | null;
     telegram_id?: string | number | null;
     telegram_username?: string | null;
+    telegram_linked_at?: string | null;
     balance?: number | string | null;
     created_at: string;
     is_blocked?: boolean | null;
@@ -57,8 +61,14 @@ export default function AdminUsersPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id: editingUser.id,
+                    email: editingUser.email,
                     full_name: editingUser.full_name,
+                    phone: editingUser.phone,
+                    bvn: editingUser.bvn,
+                    nin: editingUser.nin,
                     role: editingUser.role,
+                    telegram_id: editingUser.telegram_id,
+                    telegram_username: editingUser.telegram_username,
                     balance: editingUser.balance
                 })
             });
@@ -184,6 +194,7 @@ export default function AdminUsersPage() {
     const filteredUsers = users.filter(u =>
         u.email?.toLowerCase().includes(normalizedSearch) ||
         u.full_name?.toLowerCase().includes(normalizedSearch) ||
+        u.phone?.toLowerCase().includes(normalizedSearch) ||
         String(u.telegram_id || '').toLowerCase().includes(normalizedSearch) ||
         String(u.telegram_username || '').toLowerCase().includes(normalizedSearch)
     );
@@ -214,6 +225,7 @@ export default function AdminUsersPage() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telegram</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reward Balance</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
@@ -263,6 +275,7 @@ export default function AdminUsersPage() {
                                             <span className="text-gray-500 text-sm">—</span>
                                         )}
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.phone || '—'}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                         ₦{Number(user.balance || 0).toLocaleString()}
                                     </td>
@@ -433,6 +446,30 @@ export default function AdminUsersPage() {
                                         onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
                                         className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm"
                                     />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700">Email</label>
+                                    <input type="email" value={editingUser.email || ''} onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700">Phone / WhatsApp</label>
+                                    <input type="tel" value={editingUser.phone || ''} onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700">BVN</label>
+                                    <input inputMode="numeric" value={editingUser.bvn || ''} onChange={(e) => setEditingUser({ ...editingUser, bvn: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700">NIN</label>
+                                    <input inputMode="numeric" value={editingUser.nin || ''} onChange={(e) => setEditingUser({ ...editingUser, nin: e.target.value.replace(/\D/g, '').slice(0, 11) })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700">Telegram ID</label>
+                                    <input value={editingUser.telegram_id || ''} onChange={(e) => setEditingUser({ ...editingUser, telegram_id: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700">Telegram Username</label>
+                                    <input value={editingUser.telegram_username || ''} onChange={(e) => setEditingUser({ ...editingUser, telegram_username: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 border px-2 py-1 text-sm" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">Role</label>

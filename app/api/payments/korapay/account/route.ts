@@ -4,6 +4,7 @@ import { createServerClient } from '@supabase/ssr';
 import { ensureWalletRow, getUserProfileName } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createKoraPayVirtualAccount } from '@/lib/korapay';
+import { getActivePaymentProvider } from '@/lib/payment-providers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -87,6 +88,9 @@ async function upsertVirtualAccount(userId: string, payload: Record<string, any>
 
 export async function GET() {
   try {
+    if (await getActivePaymentProvider() !== 'korapay') {
+      return NextResponse.json({ error: 'KoraPay is not the active payment provider.' }, { status: 403 });
+    }
     const { user, error: authError } = await getCurrentUser();
     if (authError || !user) {
       console.error('[korapay-account] GET unauthorized:', authError?.message || 'No user session');
@@ -128,6 +132,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    if (await getActivePaymentProvider() !== 'korapay') {
+      return NextResponse.json({ error: 'KoraPay is not the active payment provider.' }, { status: 403 });
+    }
     const { user, error: authError } = await getCurrentUser();
     if (authError || !user) {
       console.error('[korapay-account] POST unauthorized:', authError?.message || 'No user session');

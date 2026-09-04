@@ -1,10 +1,20 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
-export type PaymentProvider = 'monnify' | 'korapay';
+export type PaymentProvider = 'monnify' | 'korapay' | 'none';
 
 export function normalizePaymentProvider(value?: string | null): PaymentProvider {
-  const lower = (value || 'monnify').toLowerCase();
-  return lower === 'korapay' ? 'korapay' : 'monnify';
+  let normalizedValue = value || 'monnify';
+  try {
+    const parsed = JSON.parse(normalizedValue);
+    if (typeof parsed === 'string') normalizedValue = parsed;
+  } catch {
+    // The setting may already be a plain string.
+  }
+
+  const lower = normalizedValue.trim().toLowerCase().replace(/^['"]|['"]$/g, '');
+  if (lower === 'korapay') return 'korapay';
+  if (lower === 'none' || lower === 'manual') return 'none';
+  return 'monnify';
 }
 
 export async function getActivePaymentProvider(): Promise<PaymentProvider> {
@@ -19,7 +29,8 @@ export async function getActivePaymentProvider(): Promise<PaymentProvider> {
     return 'monnify';
   }
 
-  return normalizePaymentProvider(typeof data?.value === 'string' ? data.value : (data?.value as any)?.provider ?? 'monnify');
+  const settingValue = typeof data?.value === 'string' ? data.value : (data?.value as any)?.provider;
+  return normalizePaymentProvider(settingValue);
 }
 
 export async function setActivePaymentProvider(provider: PaymentProvider) {

@@ -56,6 +56,33 @@ async function getLastNDaysProfit(days: number) {
   return result;
 }
 
+async function getMondayToSundayProfit() {
+  const monday = new Date();
+  monday.setHours(0, 0, 0, 0);
+  const day = monday.getDay();
+  monday.setDate(monday.getDate() - (day === 0 ? 6 : day - 1));
+
+  const days: { label: string; profit: number; count: number }[] = [];
+  for (let offset = 0; offset < 7; offset += 1) {
+    const start = new Date(monday);
+    start.setDate(monday.getDate() + offset);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 1);
+    const dayProfit = await sumProfitBetween(start.toISOString(), end.toISOString());
+    days.push({
+      label: start.toLocaleDateString('en-NG', { weekday: 'short', month: 'short', day: 'numeric' }),
+      profit: dayProfit.profit,
+      count: dayProfit.count,
+    });
+  }
+
+  return {
+    days,
+    profit: days.reduce((total, entry) => total + entry.profit, 0),
+    count: days.reduce((total, entry) => total + entry.count, 0),
+  };
+}
+
 export async function GET() {
   try {
     const now = new Date();
@@ -63,15 +90,16 @@ export async function GET() {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const yearStart = new Date(now.getFullYear(), 0, 1);
 
-    const [week, month, year, all, days] = await Promise.all([
+    const [week, month, year, all, days, mondayToSunday] = await Promise.all([
       sumProfitSince(weekStart.toISOString()),
       sumProfitSince(monthStart.toISOString()),
       sumProfitSince(yearStart.toISOString()),
       sumProfitSince(),
-      getLastNDaysProfit(7)
+      getLastNDaysProfit(7),
+      getMondayToSundayProfit()
     ]);
 
-    return NextResponse.json({ week, month, year, all, days });
+    return NextResponse.json({ week, month, year, all, days, mondayToSunday });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || String(err) }, { status: 500 });
   }

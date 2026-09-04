@@ -81,6 +81,40 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing transaction reference.' }, { status: 400 });
   }
 
+  const checkoutUserId = chargeData?.metadata?.userid || chargeData?.metadata?.user_id;
+  if (checkoutUserId && chargeData?.metadata?.purpose === 'wallet-funding') {
+    try {
+      const verifiedCharge = await getKoraPayCharge(reference);
+      const verified = verifiedCharge?.data || {};
+      if (String(verified.status || '').toLowerCase() !== 'success') {
+        return NextResponse.json({ ok: true, status: 'failed' }, { status: 200 });
+      }
+
+      const webhookAmount = normalizeAmount(chargeData.amount);
+      const verifiedAmount = normalizeAmount(verified.amount_accepted);
+      const verifiedChargedAmount = normalizeAmount(verified.amount);
+      const fee = normalizeAmount(verified.fee);
+      if (normalizeCurrency(verified.currency) !== normalizeCurrency(chargeData.currency) || webhookAmount !== verifiedChargedAmount || verifiedAmount !== verifiedChargedAmount || fee < 0 || fee >= verifiedAmount) {
+        return NextResponse.json({ ok: true, status: 'payment_mismatch' }, { status: 200 });
+      }
+      const creditedAmount = verifiedAmount - fee;
+
+      const { data: creditResult, error: creditError } = await supabaseAdmin.rpc('process_korapay_checkout_deposit', {
+        p_user_id: checkoutUserId,
+        p_amount: creditedAmount,
+        p_reference: reference,
+        p_currency: normalizeCurrency(verified.currency),
+        p_payment_status: verified.status,
+        p_payload: chargeData,
+      });
+      if (creditError) throw creditError;
+      return NextResponse.json({ ok: true, ...(creditResult as Record<string, unknown>) }, { status: 200 });
+    } catch (error: any) {
+      log('Checkout webhook credit failed', { error: error?.message || String(error) });
+      return NextResponse.json({ error: error?.message || 'Failed to process checkout webhook.' }, { status: 500 });
+    }
+  }
+
   const accountReference = chargeData?.virtual_bank_account_details?.virtual_bank_account?.account_reference || null;
   if (!accountReference) {
     log('Rejected: missing virtual account reference');
@@ -115,7 +149,7 @@ export async function POST(req: Request) {
     const verified = verifiedCharge?.data || {};
     log('KoraPay charge verification response received', {
       status: verified.status,
-      amount: verified.amount_paid ?? verified.amount,
+      amount: verified.amount_accepted ?? verified.amount,
       currency: verified.currency,
       accountReference: verified.virtual_bank_account?.account_reference,
     });
@@ -126,7 +160,9 @@ export async function POST(req: Request) {
     }
 
     const expectedAmount = normalizeAmount(chargeData.amount);
-    const verifiedAmount = normalizeAmount(verified.amount_paid ?? verified.amount);
+    const verifiedAmount = normalizeAmount(verified.amount_accepted);
+    const verifiedChargedAmount = normalizeAmount(verified.amount);
+    const fee = normalizeAmount(verified.fee);
     const expectedCurrency = normalizeCurrency(chargeData.currency);
     const verifiedCurrency = normalizeCurrency(verified.currency);
 
@@ -135,10 +171,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, status: 'currency_mismatch' }, { status: 200 });
     }
 
-    if (verifiedAmount !== expectedAmount) {
-      log('Accepted but not credited: amount mismatch', { expectedAmount, verifiedAmount });
+    if (verifiedChargedAmount !== expectedAmount || verifiedAmount !== verifiedChargedAmount || fee < 0 || fee >= verifiedAmount) {
+      log('Accepted but not credited: amount or fee mismatch', { expectedAmount, verifiedAmount, verifiedChargedAmount, fee });
       return NextResponse.json({ ok: true, status: 'amount_mismatch' }, { status: 200 });
     }
+    const creditedAmount = verifiedAmount - fee;
 
     const expectedAccountReference = String(
       verified.virtual_bank_account?.account_reference || virtualAccount.account_reference || ''
@@ -154,7 +191,7 @@ export async function POST(req: Request) {
 
     log('Atomically recording transaction and crediting wallet', {
       userId: virtualAccount.user_id,
-      amount: verifiedAmount,
+      amount: creditedAmount,
       reference,
     });
 
@@ -162,7 +199,7 @@ export async function POST(req: Request) {
       'process_korapay_deposit',
       {
         p_user_id: virtualAccount.user_id,
-        p_amount: verifiedAmount,
+        p_amount: creditedAmount,
         p_reference: reference,
         p_account_reference: accountReference,
         p_currency: verifiedCurrency,

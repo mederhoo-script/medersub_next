@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getActivePaymentProvider } from '@/lib/payment-providers';
 
 export async function POST(req: Request) {
     try {
+        if (await getActivePaymentProvider() !== 'monnify') {
+            return NextResponse.json({ error: 'Monnify is not the active payment provider.' }, { status: 403 });
+        }
         const { transactionReference, amountPaid, userId, paymentStatus } = await req.json();
 
         console.log('[VERIFY] Processing Monnify payment for user:', userId);

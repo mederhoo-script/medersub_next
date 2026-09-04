@@ -73,6 +73,18 @@ export async function POST(req: Request) {
         }
 
         if (hasBiometricToken) {
+            const { data: pinProfile, error: pinProfileError } = await supabaseAdmin
+                .from('profiles')
+                .select('transaction_pin_changed')
+                .eq('id', userId)
+                .single();
+            if (pinProfileError || !pinProfile) {
+                return jsonError('User profile not found.', 404);
+            }
+            if (!pinProfile.transaction_pin_changed) {
+                return jsonError('Set a new transaction PIN before making purchases.', 403);
+            }
+
             const { data: approval, error: approvalError } = await supabaseAdmin
                 .from('transaction_biometric_approvals')
                 .select('token, expires_at, consumed_at')

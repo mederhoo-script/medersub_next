@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export async function GET() {
+    if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     const { data, error } = await supabaseAdmin.from('system_settings').select('*');
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -19,6 +21,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
     try {
+    if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const { key, value } = await req.json();
         const targetKey = key || 'general';
         const targetValue = value ?? { maintenance_mode: false, global_markup_percentage: 0 };

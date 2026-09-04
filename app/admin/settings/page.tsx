@@ -5,7 +5,7 @@ import { Loader2, Save } from 'lucide-react';
 
 export default function SettingsPage() {
     const [config, setConfig] = useState<any>({ markup: 0, maintenance: false });
-    const [activeProvider, setActiveProvider] = useState<'monnify' | 'korapay'>('monnify');
+    const [activeProvider, setActiveProvider] = useState<'monnify' | 'korapay' | 'none'>('monnify');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [profitData, setProfitData] = useState<any | null>(null);
@@ -21,7 +21,14 @@ export default function SettingsPage() {
                 } else if (ct.includes('application/json')) {
                     const data = await res.json();
                     if (data.general) setConfig(data.general);
-                    if (data.payment_provider) setActiveProvider(data.payment_provider === 'korapay' ? 'korapay' : 'monnify');
+                    if (data.payment_provider) {
+                        let savedProvider = String(data.payment_provider).toLowerCase();
+                        try {
+                            const parsed = JSON.parse(savedProvider);
+                            if (typeof parsed === 'string') savedProvider = parsed.toLowerCase();
+                        } catch { /* Stored value may already be plain text. */ }
+                        setActiveProvider(savedProvider === 'korapay' ? 'korapay' : savedProvider === 'none' || savedProvider === 'manual' ? 'none' : 'monnify');
+                    }
                 } else {
                     const text = await res.text();
                     console.error('Settings returned non-JSON response', text);
@@ -109,6 +116,8 @@ export default function SettingsPage() {
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
 
     const dailyList = Array.isArray(profitData?.days) ? profitData.days : [];
+    const mondayToSundayList = Array.isArray(profitData?.mondayToSunday?.days) ? profitData.mondayToSunday.days : [];
+    const maxMondayToSundayProfit = Math.max(...mondayToSundayList.map((entry: any) => Number(entry?.profit || 0)), 0) || 1;
     const maxDailyProfit = Math.max(...dailyList.map((entry: any) => Number(entry?.profit || 0)), 0) || 1;
 
     return (
@@ -147,11 +156,12 @@ export default function SettingsPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">Active Wallet Funding Provider</label>
                         <select
                             value={activeProvider}
-                            onChange={(e) => setActiveProvider(e.target.value as 'monnify' | 'korapay')}
+                            onChange={(e) => setActiveProvider(e.target.value as 'monnify' | 'korapay' | 'none')}
                             className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="monnify">Monnify Virtual Account</option>
                             <option value="korapay">KoraPay Virtual Account</option>
+                            <option value="none">Manual funding only</option>
                         </select>
                     </div>
 
@@ -234,6 +244,31 @@ export default function SettingsPage() {
                     )) : (
                         <p className="text-sm text-gray-500">No daily profit data yet.</p>
                     )}
+                </div>
+            </div>
+
+            <div className="mt-6 bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h4 className="text-sm font-medium text-gray-700">This Week (Monday to Sunday)</h4>
+                        <p className="mt-1 text-lg font-semibold text-gray-900">
+                            {profitData ? Number(profitData.mondayToSunday?.profit || 0).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }) : '—'}
+                        </p>
+                    </div>
+                    <span className="text-xs text-gray-500">{profitData?.mondayToSunday?.count ?? 0} transactions</span>
+                </div>
+                <div className="space-y-3">
+                    {mondayToSundayList.map((entry: any) => (
+                        <div key={entry.label} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs text-gray-600">
+                                <span>{entry.label}</span>
+                                <span>{Number(entry.profit || 0).toLocaleString('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 })}</span>
+                            </div>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100">
+                                <div className="h-full rounded-full bg-linear-to-r from-emerald-500 to-cyan-500" style={{ width: `${Math.max((Number(entry.profit || 0) / maxMondayToSundayProfit) * 100, 8)}%` }} />
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>

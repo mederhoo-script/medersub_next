@@ -56,12 +56,14 @@ export async function POST(req: Request) {
 
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
-      .select('transaction_pin_hash')
+      .select('transaction_pin_hash, transaction_pin_changed')
       .eq('id', user.id)
       .single();
     if (error || !profile) return NextResponse.json({ error: 'Profile not found.' }, { status: 404 });
 
-    if (!TRANSACTION_PIN_PATTERN.test(currentPin || '') || !verifyTransactionPin(currentPin, profile.transaction_pin_hash)) {
+    const profileWithPinStatus = profile as typeof profile & { transaction_pin_changed: boolean };
+    const isInitialPin = !profileWithPinStatus.transaction_pin_changed;
+    if (!isInitialPin && (!TRANSACTION_PIN_PATTERN.test(currentPin || '') || !verifyTransactionPin(currentPin, profile.transaction_pin_hash))) {
       return NextResponse.json({ error: 'Current transaction PIN is incorrect.' }, { status: 400 });
     }
 

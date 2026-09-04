@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Lock, Mail, User, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, Phone, User, Loader2, Eye, EyeOff } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const TelegramButton = dynamic(() => import('@/components/auth/telegram-button'), { ssr: false });
@@ -11,6 +11,7 @@ const TelegramButton = dynamic(() => import('@/components/auth/telegram-button')
 export default function RegisterPage() {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -39,6 +40,7 @@ export default function RegisterPage() {
             options: {
                 data: {
                     full_name: fullName,
+                    phone: phone.trim(),
                 },
             },
         });
@@ -90,6 +92,20 @@ export default function RegisterPage() {
                                 placeholder="Full Name"
                                 value={fullName}
                                 onChange={(e) => setFullName(e.target.value)}
+                            />
+                        </div>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Phone className="h-5 w-5 text-gray-400" />
+                            </div>
+                            <input
+                                type="tel"
+                                inputMode="tel"
+                                required
+                                className="appearance-none rounded-lg relative block w-full pl-10 px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                                placeholder="Phone or WhatsApp number"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
                             />
                         </div>
                         <div className="relative">

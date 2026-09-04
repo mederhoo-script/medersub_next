@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { requireAdmin } from '@/lib/admin-auth';
 
 export async function GET() {
     try {
+        if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const { data: users, error } = await supabaseAdmin
             .from('profiles')
             .select('*, wallets(balance), reward_balance_ngn')
@@ -26,14 +28,28 @@ export async function GET() {
 
 export async function PUT(req: Request) {
     try {
-        const { id, full_name, role, balance } = await req.json();
+        if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        const { id, email, full_name, phone, bvn, nin, role, telegram_id, telegram_username, balance } = await req.json();
 
         if (!id) return NextResponse.json({ error: 'User ID required' }, { status: 400 });
 
         // Update Profile
+        if (bvn && (!/^\d{11}$/.test(String(bvn)) || String(bvn).length !== 11)) {
+            return NextResponse.json({ error: 'BVN must be 11 digits.' }, { status: 400 });
+        }
+
         const { error: profileError } = await supabaseAdmin
             .from('profiles')
-            .update({ full_name, role })
+            .update({
+                email: email || null,
+                full_name: full_name || null,
+                phone: phone || null,
+                bvn: bvn || null,
+                nin: nin || null,
+                role: role || 'USER',
+                telegram_id: telegram_id || null,
+                telegram_username: telegram_username || null,
+            })
             .eq('id', id);
 
         if (profileError) return NextResponse.json({ error: profileError.message }, { status: 500 });
@@ -65,6 +81,7 @@ export async function PUT(req: Request) {
 
 export async function DELETE(req: Request) {
     try {
+        if (!await requireAdmin()) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         const { id } = await req.json();
 
         if (!id) return NextResponse.json({ error: 'User ID required' }, { status: 400 });
