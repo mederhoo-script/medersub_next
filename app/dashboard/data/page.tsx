@@ -75,6 +75,32 @@ export default function DataPage() {
     const [beneficiaries, setBeneficiaries] = useState<string[]>([]);
     const [beneficiaryOpen, setBeneficiaryOpen] = useState(false);
     const categoryScrollerRef = useRef<HTMLDivElement>(null);
+    const [categoryScrollState, setCategoryScrollState] = useState({ canScrollLeft: false, canScrollRight: false });
+
+    useEffect(() => {
+        const scroller = categoryScrollerRef.current;
+        if (!scroller) return;
+
+        const updateCategoryScrollState = () => {
+            const maxScrollLeft = scroller.scrollWidth - scroller.clientWidth;
+            setCategoryScrollState({
+                canScrollLeft: scroller.scrollLeft > 2,
+                canScrollRight: maxScrollLeft - scroller.scrollLeft > 2,
+            });
+        };
+
+        updateCategoryScrollState();
+        scroller.addEventListener('scroll', updateCategoryScrollState, { passive: true });
+        const resizeObserver = new ResizeObserver(updateCategoryScrollState);
+        resizeObserver.observe(scroller);
+        window.addEventListener('resize', updateCategoryScrollState);
+
+        return () => {
+            scroller.removeEventListener('scroll', updateCategoryScrollState);
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', updateCategoryScrollState);
+        };
+    }, [categories.length]);
 
     const scrollCategories = (direction: 'left' | 'right') => {
         categoryScrollerRef.current?.scrollBy({ left: direction === 'left' ? -180 : 180, behavior: 'smooth' });
@@ -275,17 +301,18 @@ export default function DataPage() {
                         </div>
                     </div>
                     <div>
-                        <div className="flex items-center gap-1">
-                            <button type="button" onClick={() => scrollCategories('left')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#687181] shadow-sm hover:text-[#0965df]" aria-label="Previous plan categories">
+                        <div className="flex min-w-0 items-center gap-1">
+                            {categoryScrollState.canScrollLeft && <button type="button" onClick={() => scrollCategories('left')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm hover:text-[#0965df]" aria-label="Previous plan categories">
                                 <ChevronLeft className="h-4 w-4" />
-                            </button>
-                            <div ref={categoryScrollerRef} className="scrollbar-none flex min-w-0 gap-2 overflow-x-auto pb-4">
-                                {categories.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setPlan(null); }} className={`shrink-0 rounded-full px-5 py-2 text-xs font-medium sm:px-7 sm:py-3 sm:text-[16px] ${category === item ? 'bg-[#0965df] text-white' : 'bg-white text-[#454c58]'}`}>{displayName(item)}</button>)}
+                            </button>}
+                            <div ref={categoryScrollerRef} className="scrollbar-none flex min-w-0 flex-1 gap-2 overflow-x-auto pb-0">
+                                {categories.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setPlan(null); }} className={`shrink-0 rounded-full px-3 py-2 text-xs font-medium sm:px-7 sm:py-3 sm:text-[16px] ${category === item ? 'bg-[#0965df] text-white' : 'bg-white text-[#454c58]'}`}>{displayName(item)}</button>)}
                             </div>
-                            <button type="button" onClick={() => scrollCategories('right')} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#687181] shadow-sm hover:text-[#0965df]" aria-label="Next plan categories">
+                            {categoryScrollState.canScrollRight && <button type="button" onClick={() => scrollCategories('right')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm hover:text-[#0965df]" aria-label="Next plan categories">
                                 <ChevronRight className="h-4 w-4" />
-                            </button>
+                            </button>}
                         </div>
+                        <div className="h-5"></div>
                         {loadingPlans ? <div className="flex justify-center py-10"><Loader2 className="h-7 w-7 animate-spin text-blue-600" /></div> : <div className="grid grid-cols-2 gap-3 sm:gap-4">
                             {visiblePlans.map((item) => {
                                 const amount = Number(item.amount.toString().replace(/,/g, '')) + calculateDataProfit(item.dataPlan);
