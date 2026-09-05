@@ -84,19 +84,20 @@ export default function AdminTransactionsPage() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inlomax ID</th>
                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {loading ? (
                             <tr>
-                                <td colSpan={8} className="px-6 py-8 text-center">
+                                <td colSpan={9} className="px-6 py-8 text-center">
                                     <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-500" /></div>
                                 </td>
                             </tr>
                         ) : filteredTx.length === 0 ? (
                             <tr>
-                                <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                                <td colSpan={9} className="px-6 py-8 text-center text-gray-500">
                                     No transactions found.
                                 </td>
                             </tr>
@@ -131,6 +132,9 @@ export default function AdminTransactionsPage() {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
                                         {new Date(tx.created_at).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
+                                        {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <button

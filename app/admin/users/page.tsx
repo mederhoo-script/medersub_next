@@ -421,8 +421,8 @@ export default function AdminUsersPage() {
 
             {/* Responsive user editor drawer */}
             {editingUser && (
-                <div className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="edit-user-title">
-                    <div className="absolute inset-y-0 right-0 flex w-full max-w-2xl flex-col bg-slate-50 shadow-2xl">
+                <div className="fixed inset-0 z-[100] bg-slate-950/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="edit-user-title">
+                    <div className="pointer-events-auto absolute inset-y-0 right-0 z-[101] flex h-[100dvh] min-h-0 w-full max-w-2xl flex-col bg-slate-50 shadow-2xl">
                             <div className="flex items-start justify-between border-b border-slate-200 bg-white px-5 py-5 sm:px-8">
                                 <div className="flex min-w-0 items-center gap-3">
                                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-lg font-bold text-blue-700">
@@ -446,7 +446,7 @@ export default function AdminUsersPage() {
                                     <p className="mt-1 text-lg font-bold text-slate-900">₦{Number((editingUser as any).rewardBalance || 0).toLocaleString()}</p>
                                 </div>
                             </div>
-                            <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+                            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
                             <form id="user-profile-form" onSubmit={handleUpdateUser} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700">Full Name</label>
@@ -541,7 +541,7 @@ export default function AdminUsersPage() {
                             </div>
                         </div>
                         </div>
-                        <div className="flex gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:px-8">
+                        <div className="flex shrink-0 gap-3 border-t border-slate-200 bg-white px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-8">
                             <button type="button" onClick={() => setEditingUser(null)} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
                             <button type="submit" form="user-profile-form" disabled={saving} className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50">
                                 {saving ? 'Saving...' : 'Save changes'}
