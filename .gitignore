@@ -10,8 +10,8 @@
 !.yarn/releases
 !.yarn/versions
 
-
 *.py
+inter*
 # testing
 /coverage
 
