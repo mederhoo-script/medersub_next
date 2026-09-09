@@ -71,20 +71,18 @@ function markedAmount(value: unknown, markup: number) {
     return Number((amount * (1 + markup / 100)).toFixed(2));
 }
 
-/** Replace provider plan prices with public selling prices without changing IDs or service shape. */
+/** Replace every provider service amount with its public selling price without changing IDs or service shape. */
 export function applyServiceMarkup(response: unknown, markup: number) {
-    if (!response || typeof response !== 'object') return response;
-    const clone = structuredClone(response) as { data?: Record<string, unknown> };
-    const data = clone.data;
-    if (!data || typeof data !== 'object') return clone;
+    const replaceAmounts = (value: unknown): unknown => {
+        if (Array.isArray(value)) return value.map(replaceAmounts);
+        if (!value || typeof value !== 'object') return value;
 
-    for (const group of ['dataPlans', 'cablePlans', 'education']) {
-        const plans = data[group];
-        if (!Array.isArray(plans)) continue;
-        data[group] = plans.map((plan) => {
-            if (!plan || typeof plan !== 'object' || !('amount' in plan)) return plan;
-            return { ...plan, amount: markedAmount((plan as ApiPayload).amount, markup) };
-        });
-    }
-    return clone;
+        const plan = value as ApiPayload;
+        return Object.fromEntries(Object.entries(plan).map(([key, child]) => [
+            key,
+            key === 'amount' ? markedAmount(child, markup) : replaceAmounts(child),
+        ]));
+    };
+
+    return replaceAmounts(response);
 }

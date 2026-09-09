@@ -45,13 +45,16 @@ export async function GET() {
         .single();
     if (error || !data) return NextResponse.json({ status: 'failed', message: 'Unable to load API key' }, { status: 500 });
 
-    if (data.api_key_hash) {
+    // Keys assigned by the database trigger/backfill cannot be revealed because
+    // only their hashes are stored. Replace that placeholder on first visit so
+    // every user can actually copy a usable key from Account Settings.
+    if (data.api_key_hash && data.api_key_prefix !== 'Active API key') {
         return NextResponse.json({ status: 'success', data: { apiKey: null, apiKeyPrefix: data.api_key_prefix || 'Active API key' } });
     }
 
     const apiKey = await createOrRotateApiKey(userId);
     if (!apiKey) return NextResponse.json({ status: 'failed', message: 'Unable to create API key' }, { status: 500 });
-    return NextResponse.json({ status: 'success', message: 'Your API key has been created. Save it now; it cannot be shown again.', data: { apiKey, apiKeyPrefix: apiKeyPrefix(apiKey) } });
+    return NextResponse.json({ status: 'success', message: 'Your API key is ready. Save it now; it cannot be shown again.', data: { apiKey, apiKeyPrefix: apiKeyPrefix(apiKey) } });
 }
 
 /** Rotate the caller's public key. Display the new key once, then store it safely. */

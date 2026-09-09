@@ -7,6 +7,7 @@ import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
 import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
 import { useTransactionPin } from '@/components/dashboard/use-transaction-pin';
+import { educationProfitPerPin, type PricingSettings } from '@/utils/pricing';
 
 interface EducationService {
     serviceID: string;
@@ -23,6 +24,7 @@ export default function EducationPage() {
     const { requestPin, requestBiometricApproval, PinDialog, biometricSupported, biometricSupportMessage } = useTransactionPin();
     const router = useRouter();
     const [educationServices, setEducationServices] = useState<EducationService[]>([]);
+    const [pricing, setPricing] = useState<PricingSettings>({});
     const [loadingServices, setLoadingServices] = useState(true);
     const [selectedService, setSelectedService] = useState<EducationService | null>(null);
     const [quantity, setQuantity] = useState(1);
@@ -33,6 +35,10 @@ export default function EducationPage() {
 
     useEffect(() => {
         fetchServices();
+        fetch('/api/pricing')
+            .then((response) => response.ok ? response.json() : null)
+            .then((response) => { if (response?.status === 'success') setPricing(response.data); })
+            .catch(() => undefined);
     }, []);
 
     const fetchServices = async () => {
@@ -54,7 +60,7 @@ export default function EducationPage() {
     const calculateTotal = () => {
         if (!selectedService) return 0;
         const baseAmount = Number(selectedService.amount.replace(/,/g, ''));
-        const profitPerPin = 20;
+        const profitPerPin = educationProfitPerPin(pricing);
         return (baseAmount + profitPerPin) * quantity;
     };
 
@@ -162,7 +168,7 @@ export default function EducationPage() {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 {educationServices.map((service) => {
                                     const baseAmount = Number(service.amount.replace(/,/g, ''));
-                                    const profitPerPin = 20;
+                                    const profitPerPin = educationProfitPerPin(pricing);
                                     const pricePerPin = baseAmount + profitPerPin;
 
                                     return (
