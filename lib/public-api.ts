@@ -11,6 +11,10 @@ export function createApiKey() {
     return `ms_live_${randomBytes(24).toString('base64url')}`;
 }
 
+export function apiKeyPrefix(apiKey: string) {
+    return `${apiKey.slice(0, 16)}…${apiKey.slice(-4)}`;
+}
+
 export async function authenticatePublicApi(request: Request) {
     const authorization = request.headers.get('authorization');
     const match = authorization?.match(/^Token\s+(.+)$/i);

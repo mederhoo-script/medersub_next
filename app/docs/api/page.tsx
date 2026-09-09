@@ -29,7 +29,7 @@ export default function ApiDocumentationPage() {
     <section className="mt-10 rounded-xl border bg-slate-50 p-6">
       <h2 className="text-2xl font-semibold">Getting started</h2>
       <p className="mt-3">Base URL: <code className="rounded bg-white px-2 py-1">https://your-domain.com/api/v1</code></p>
-      <p className="mt-3">Authenticate every request with <code className="rounded bg-white px-2 py-1">Authorization: Token YOUR_MEDERSUB_API_KEY</code>. Create or rotate your key while signed in with <code className="rounded bg-white px-2 py-1">POST /api/account/api-key</code>; save the returned <code>ms_live_…</code> key because it is shown only once.</p>
+      <p className="mt-3">The <code>/api/v1/services</code> endpoint is public. Authenticate every other request with <code className="rounded bg-white px-2 py-1">Authorization: Token YOUR_MEDERSUB_API_KEY</code>. Check or rotate your key in Account Settings, or while signed in call <code className="rounded bg-white px-2 py-1">POST /api/account/api-key</code>; save the returned <code>ms_live_…</code> key because it is shown only once.</p>
       <p className="mt-3">For purchases, send a unique <code>request-id</code>. It is forwarded unchanged to Inlomax, enabling safe retries. If omitted, Medersub creates one.</p>
     </section>
     <section className="mt-10">

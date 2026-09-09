@@ -32,7 +32,8 @@ async function bodyFor(request: Request): Promise<ApiPayload | null> {
 export async function GET(request: Request, context: { params: Promise<{ endpoint: string }> }) {
     const { endpoint } = await context.params;
     if (!endpoints.has(endpoint) || !['services', 'balance'].includes(endpoint)) return failed('Endpoint not found', 404);
-    if (!await authenticatePublicApi(request)) return failed('Invalid or missing API key', 401);
+    // Service discovery is deliberately public so developers can browse plans before signing up.
+    if (endpoint !== 'services' && !await authenticatePublicApi(request)) return failed('Invalid or missing API key', 401);
 
     const response = endpoint === 'services' ? await publicInlomax.getServices() : await publicInlomax.getBalance();
     const result = endpoint === 'services' ? applyServiceMarkup(response, await publicApiMarkupPercentage()) : response;
