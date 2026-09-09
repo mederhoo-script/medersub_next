@@ -8,7 +8,7 @@ import Image from 'next/image';
 import SpendingBalances from '@/components/dashboard/spending-balances';
 import { useDefaultPaymentSource } from '@/components/dashboard/use-default-payment-source';
 import { useTransactionPin } from '@/components/dashboard/use-transaction-pin';
-import { calculateDataProfit } from '@/utils/pricing';
+import { calculateDataProfit, type PricingSettings } from '@/utils/pricing';
 
 type DataPlan = {
     serviceID: string;
@@ -52,6 +52,7 @@ export default function DataPage() {
     const { requestPin, requestBiometricApproval, PinDialog, biometricSupported, biometricSupportMessage } = useTransactionPin();
     // ... (rest of imports and state)
     const router = useRouter();
+    const [pricing, setPricing] = useState<PricingSettings>({});
     const [network, setNetwork] = useState('MTN');
     const [plans, setPlans] = useState<DataPlan[]>([]);
     const [loadingPlans, setLoadingPlans] = useState(true);
@@ -108,6 +109,10 @@ export default function DataPage() {
 
     useEffect(() => {
         fetchServices();
+        fetch('/api/pricing')
+            .then((response) => response.ok ? response.json() : null)
+            .then((response) => { if (response?.status === 'success') setPricing(response.data); })
+            .catch(() => undefined);
         fetchBeneficiaries();
     }, []);
 
@@ -315,7 +320,7 @@ export default function DataPage() {
                         <div className="h-5"></div>
                         {loadingPlans ? <div className="flex justify-center py-10"><Loader2 className="h-7 w-7 animate-spin text-blue-600" /></div> : <div className="grid grid-cols-2 gap-3 sm:gap-4">
                             {visiblePlans.map((item) => {
-                                const amount = Number(item.amount.toString().replace(/,/g, '')) + calculateDataProfit(item.dataPlan);
+                                const amount = Number(item.amount.toString().replace(/,/g, '')) + calculateDataProfit(item.dataPlan, pricing);
                                 const selected = plan?.serviceID === item.serviceID;
                                 return <button key={item.serviceID} type="button" onClick={() => setPlan(item)} className={`min-h-[135px] rounded-2xl bg-blue-100 p-3 text-left transition-all sm:min-h-[165px] sm:rounded-[21px] ${selected ? 'border-2 border-[#0965df] bg-cyan-300' : 'border-2.5 border-transparent bg-white'}`}>
                                     <span className="block text-sm text-[#202632] sm:text-[17px]">{item.validity || 'Flexible'}</span>
