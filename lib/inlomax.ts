@@ -114,3 +114,39 @@ export const inlomax = {
         }
     }
 };
+
+/**
+ * Inlomax calls used exclusively by the public API v1 wrapper. Keeping these
+ * separate from the legacy helpers above avoids changing existing website and
+ * app purchase behaviour for current users.
+ */
+async function requestForPublicApi(method: 'get' | 'post', endpoint: string, payload?: Record<string, unknown>): Promise<unknown> {
+    try {
+        const { data } = await api.request({ method, url: endpoint, data: payload });
+        return data;
+    } catch (error: unknown) {
+        if (axios.isAxiosError(error)) {
+            return error.response?.data || { status: 'failed', message: 'Unable to reach VTU provider' };
+        }
+        return { status: 'failed', message: 'Unable to reach VTU provider' };
+    }
+}
+
+export const publicInlomax = {
+    getBalance: () => requestForPublicApi('get', '/balance'),
+    getServices: () => requestForPublicApi('get', '/services'),
+    purchaseAirtime: (mobileNumber: string, amount: number, serviceID: string, requestId: string) =>
+        requestForPublicApi('post', '/airtime', { mobileNumber, amount, serviceID, 'request-id': requestId }),
+    purchaseData: (mobileNumber: string, serviceID: string, requestId: string) =>
+        requestForPublicApi('post', '/data', { mobileNumber, serviceID, 'request-id': requestId }),
+    validateCable: (iucNum: string, serviceID: string) => requestForPublicApi('post', '/validatecable', { iucNum, serviceID }),
+    purchaseCable: (iucNum: string, serviceID: string, requestId: string) =>
+        requestForPublicApi('post', '/subcable', { iucNum, serviceID, 'request-id': requestId }),
+    validateMeter: (meterNum: string, serviceID: string, meterType: number) =>
+        requestForPublicApi('post', '/validatemeter', { meterNum, serviceID, meterType }),
+    payElectricity: (meterNum: string, serviceID: string, meterType: number, amount: number, requestId: string) =>
+        requestForPublicApi('post', '/payelectric', { meterNum, serviceID, meterType, amount, 'request-id': requestId }),
+    getTransaction: (reference: string) => requestForPublicApi('post', '/transaction', { reference }),
+    purchaseEducation: (serviceID: string, quantity: number, requestId: string) =>
+        requestForPublicApi('post', '/education', { serviceID, quantity, 'request-id': requestId }),
+};

@@ -152,6 +152,15 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="pt-6 border-t border-gray-100">
+                        <h3 className="text-lg font-medium text-gray-900 mb-4">Public API pricing</h3>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Public API markup (%)<span className="text-gray-400 font-normal ml-2">Applied only to prices returned by <code>/api/v1/services</code>; existing user pricing is unchanged.</span></label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">%</span>
+                            <input type="number" min="0" step="0.01" value={config.public_api_markup_percentage || 0} onChange={(e) => setConfig({ ...config, public_api_markup_percentage: Number(e.target.value) })} className="pl-8 pr-4 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-100">
                         <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Provider</h3>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Active Wallet Funding Provider</label>
                         <select
