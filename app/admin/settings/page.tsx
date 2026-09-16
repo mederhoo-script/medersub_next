@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Loader2, Save } from 'lucide-react';
 
 export default function SettingsPage() {
-    const [config, setConfig] = useState<any>({ markup: 0, maintenance: false, public_api_markup: 0 });
+    const [config, setConfig] = useState<any>({ markup: 0, maintenance: false });
     const [activeProvider, setActiveProvider] = useState<'monnify' | 'korapay' | 'none'>('monnify');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -179,11 +179,25 @@ export default function SettingsPage() {
 
                     <div className="pt-6 border-t border-gray-100">
                         <h3 className="text-lg font-medium text-gray-900 mb-4">Public API pricing</h3>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Public API profit per service (₦)<span className="text-gray-400 font-normal ml-2">A fixed amount added to every price returned by <code>/api/v1/services</code>; existing user pricing is unchanged.</span></label>
-                        <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₦</span>
-                            <input type="number" min="0" step="0.01" value={config.public_api_markup ?? 0} onChange={(e) => setConfig({ ...config, public_api_markup: Number(e.target.value) })} className="pl-8 pr-4 py-2 border border-gray-200 rounded-lg w-full focus:ring-2 focus:ring-blue-500" />
+                        <p className="mb-4 text-sm text-gray-500">These independent profits are added to data and education prices returned by <code>/api/v1/services</code>.</p>
+                        <h4 className="mb-2 text-sm font-medium text-gray-700">Data plan profit (₦)</h4>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {[
+                                ['public_api_data_profit_up_to_1gb', 'Up to 1 GB', 10],
+                                ['public_api_data_profit_up_to_3gb', 'Over 1 GB to 3 GB', 20],
+                                ['public_api_data_profit_up_to_5gb', 'Over 3 GB to 5 GB', 30],
+                                ['public_api_data_profit_up_to_10gb', 'Over 5 GB to 10 GB', 50],
+                                ['public_api_data_profit_over_10gb', 'Over 10 GB', 100],
+                            ].map(([key, label, fallback]) => (
+                                <label key={key as string} className="block text-sm font-medium text-gray-700">
+                                    {label}
+                                    <input type="number" min="0" step="0.01" value={config[key as string] ?? fallback} onChange={(e) => setConfig({ ...config, [key]: Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+                                </label>
+                            ))}
                         </div>
+                        <label className="mt-4 block text-sm font-medium text-gray-700">Education profit per exam PIN (₦)
+                            <input type="number" min="0" step="0.01" value={config.public_api_education_profit_per_pin ?? 20} onChange={(e) => setConfig({ ...config, public_api_education_profit_per_pin: Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+                        </label>
                     </div>
 
                     <div className="pt-6 border-t border-gray-100">

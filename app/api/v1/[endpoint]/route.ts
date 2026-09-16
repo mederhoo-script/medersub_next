@@ -6,7 +6,7 @@ import {
     authenticatePublicApi,
     generatedRequestId,
     providerStatus,
-    publicApiMarkup,
+    publicApiPricing,
     requirePositiveNumber,
     requireString,
 } from '@/lib/public-api';
@@ -51,7 +51,7 @@ export async function GET(request: Request, context: { params: Promise<{ endpoin
     if (endpoint !== 'services' && !await authenticatePublicApi(request)) return failed('Invalid or missing API key', 401);
 
     const response = endpoint === 'services' ? await publicInlomax.getServices() : await publicInlomax.getBalance();
-    const result = endpoint === 'services' ? applyServiceMarkup(response, await publicApiMarkup()) : response;
+    const result = endpoint === 'services' ? applyServiceMarkup(response, await publicApiPricing()) : response;
     return endpoint === 'services'
         ? publicServiceResponse(result, providerStatus(result))
         : NextResponse.json(result, { status: providerStatus(result) });

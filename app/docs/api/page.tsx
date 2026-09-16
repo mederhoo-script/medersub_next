@@ -41,6 +41,6 @@ export default function ApiDocumentationPage() {
         <p className="mt-4 text-sm text-slate-600">All responses preserve the Inlomax <code>status</code>, <code>message</code>, and <code>data</code> structure. For example: <code>{'{ "status": "success", "message": "…", "data": {} }'}</code>.</p>
       </article>)}</div>
     </section>
-    <section className="mt-10 rounded-xl border border-amber-200 bg-amber-50 p-6"><h2 className="text-xl font-semibold">Pricing</h2><p className="mt-2">Service-plan <code>amount</code> values include the configurable Medersub public markup. Inlomax service IDs and purchase request fields remain unchanged so provider transactions use the documented upstream format.</p></section>
+    <section className="mt-10 rounded-xl border border-amber-200 bg-amber-50 p-6"><h2 className="text-xl font-semibold">Pricing</h2><p className="mt-2">Data-plan and education <code>amount</code> values include the administrator-configured API plan profits. Inlomax service IDs and purchase request fields remain unchanged so provider transactions use the documented upstream format.</p></section>
   </main>;
 }

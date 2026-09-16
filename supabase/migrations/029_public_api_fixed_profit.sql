@@ -1,6 +1,6 @@
--- Public API service prices use a fixed naira profit, just like the main
--- platform pricing, rather than a percentage markup.
+-- Remove the retired percentage and blanket public API markup fields. Plan
+-- tier settings are added by the next migration.
 UPDATE public.system_settings
-SET value = jsonb_set(value - 'public_api_markup_percentage', '{public_api_markup}', COALESCE(value->'public_api_markup', '0'::jsonb), true),
+SET value = value - 'public_api_markup_percentage' - 'public_api_markup',
     updated_at = now()
 WHERE key = 'general';
