@@ -17,8 +17,11 @@ export function apiKeyPrefix(apiKey: string) {
 
 export async function authenticatePublicApi(request: Request) {
     const authorization = request.headers.get('authorization');
-    const match = authorization?.match(/^Token\s+(.+)$/i);
-    const apiKey = match?.[1]?.trim();
+    // Support the documented Token scheme as well as the conventional Bearer
+    // and x-api-key forms used by API clients. This avoids rejecting valid
+    // user keys simply because a client library chooses a different header.
+    const match = authorization?.match(/^(?:Token|Bearer)\s+(.+)$/i);
+    const apiKey = (match?.[1] || request.headers.get('x-api-key') || request.headers.get('api-key'))?.trim();
     if (!apiKey || !apiKey.startsWith('ms_live_')) return null;
 
     const { data, error } = await supabaseAdmin
@@ -53,22 +56,22 @@ export function requirePositiveNumber(body: ApiPayload, name: string) {
 }
 
 type GeneralSettings = {
-    public_api_markup_percentage?: number | string;
-    global_markup_percentage?: number | string;
+    public_api_markup?: number | string;
     markup?: number | string;
 };
 
-export async function publicApiMarkupPercentage() {
+/** Returns the fixed naira profit added to each price returned by the public API. */
+export async function publicApiMarkup() {
     const { data } = await supabaseAdmin.from('system_settings').select('value').eq('key', 'general').maybeSingle();
     const settings = (data?.value || {}) as GeneralSettings;
-    const markup = Number(settings.public_api_markup_percentage ?? settings.global_markup_percentage ?? settings.markup ?? 0);
+    const markup = Number(settings.public_api_markup ?? settings.markup ?? 0);
     return Number.isFinite(markup) && markup >= 0 ? markup : 0;
 }
 
 function markedAmount(value: unknown, markup: number) {
     const amount = Number(String(value).replace(/,/g, ''));
     if (!Number.isFinite(amount)) return value;
-    return Number((amount * (1 + markup / 100)).toFixed(2));
+    return Number((amount + markup).toFixed(2));
 }
 
 /** Replace every provider service amount with its public selling price without changing IDs or service shape. */

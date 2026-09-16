@@ -7,7 +7,7 @@ VALUES (
     "maintenance_mode": false,
     "global_markup_percentage": 0,
     "markup": 0,
-    "public_api_markup_percentage": 0,
+    "public_api_markup": 0,
     "data_profit_up_to_1gb": 10,
     "data_profit_up_to_3gb": 20,
     "data_profit_up_to_5gb": 30,
