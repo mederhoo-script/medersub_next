@@ -24,12 +24,14 @@ async function currentUserId() {
 
 async function createOrRotateApiKey(userId: string) {
     const apiKey = createApiKey();
-    const { error } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
         .from('profiles')
         .update({ api_key_hash: hashApiKey(apiKey), api_key_prefix: apiKeyPrefix(apiKey) })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select('id')
+        .maybeSingle();
 
-    if (error) return null;
+    if (error || !data) return null;
     return apiKey;
 }
 
