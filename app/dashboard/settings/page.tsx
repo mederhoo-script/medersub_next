@@ -48,6 +48,10 @@ export default function SettingsPage() {
     promosEnabled: false,
   })
   const [savingNotificationSettings, setSavingNotificationSettings] = useState(false)
+  const [apiKey, setApiKey] = useState<string | null>(null)
+  const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(null)
+  const [apiKeyStatus, setApiKeyStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
+  const [rotatingApiKey, setRotatingApiKey] = useState(false)
 
   const [formData, setFormData] = useState({
     email: '',
@@ -105,6 +109,20 @@ export default function SettingsPage() {
         }
         }
 
+        try {
+          const apiKeyResponse = await fetch('/api/account/api-key', { credentials: 'include' })
+          const apiKeyPayload = await apiKeyResponse.json().catch(() => null)
+          if (!apiKeyResponse.ok) throw new Error(apiKeyPayload?.message || 'Unable to load API key')
+          setApiKey(apiKeyPayload?.data?.apiKey || null)
+          setApiKeyPrefix(apiKeyPayload?.data?.apiKeyPrefix || null)
+          setApiKeyStatus('ready')
+        } catch (error) {
+          console.error('Failed to load API key', error)
+          setApiKey(null)
+          setApiKeyPrefix(null)
+          setApiKeyStatus('unavailable')
+        }
+
         const notificationResponse = await fetch('/api/account/notifications', { credentials: 'include' })
         if (notificationResponse.ok) {
           const notificationPayload = await notificationResponse.json()
@@ -134,6 +152,31 @@ export default function SettingsPage() {
     }
   }, [hasTransactionPin, loading])
   
+
+  const handleRotateApiKey = async () => {
+    const creatingKey = apiKeyStatus === 'unavailable' || !apiKeyPrefix
+    if (!creatingKey && !confirm('Rotate your API key? Applications using the current key will stop working immediately.')) return
+    setRotatingApiKey(true)
+    try {
+      const response = await fetch('/api/account/api-key', { method: 'POST', credentials: 'include' })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload.message || 'Unable to rotate API key')
+      setApiKey(payload.data.apiKey)
+      setApiKeyPrefix(payload.data.apiKeyPrefix)
+      setApiKeyStatus('ready')
+      setMessage({ type: 'success', text: creatingKey ? 'API key created. Copy and save it now.' : 'API key rotated. Copy and save the new key now.' })
+    } catch (err: unknown) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Unable to rotate API key' })
+    } finally {
+      setRotatingApiKey(false)
+    }
+  }
+
+  const copyApiKey = async () => {
+    if (!apiKey) return
+    await navigator.clipboard.writeText(apiKey)
+    setMessage({ type: 'success', text: 'API key copied.' })
+  }
 
   const handleUnlinkTelegram = async () => {
     if (!confirm('Unlink Telegram from your account? You can link it again later.')) return
@@ -730,6 +773,20 @@ export default function SettingsPage() {
         </div>
 
         
+
+        <div className="mb-6 pb-6 border-b border-gray-200">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Lock className="w-5 h-5 text-purple-600 mt-1" />
+              <div>
+                <p className="font-medium text-gray-900">Developer API key</p>
+                <p className="text-sm text-gray-600">Use this key with <code>Authorization: Token …</code> for the Medersub API.</p>
+                {apiKey ? <div className="mt-3 flex flex-wrap items-center gap-2"><code className="rounded bg-gray-100 px-2 py-1 text-xs break-all">{apiKey}</code><button type="button" onClick={copyApiKey} className="text-sm font-medium text-blue-600 hover:text-blue-700">Copy</button></div> : apiKeyStatus === 'loading' ? <p className="mt-2 text-sm text-gray-500">Loading your API key…</p> : apiKeyStatus === 'unavailable' ? <p className="mt-2 text-sm text-amber-700">Your API key could not be loaded. Select “Create key” to try again.</p> : <p className="mt-2 text-sm text-gray-500">Current key: {apiKeyPrefix}. For security, full keys are shown only when created or rotated.</p>}
+              </div>
+            </div>
+            <button type="button" onClick={handleRotateApiKey} disabled={rotatingApiKey} className="shrink-0 rounded-lg border border-blue-600 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-60">{rotatingApiKey ? 'Saving…' : apiKeyStatus === 'unavailable' || !apiKeyPrefix ? 'Create key' : 'Rotate key'}</button>
+          </div>
+        </div>
 
         {/* Telegram Section */}
         <div className="flex items-start justify-between">

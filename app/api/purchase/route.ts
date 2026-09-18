@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 // Force rebuild
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { inlomax } from '@/lib/inlomax';
-import { calculateDataProfit } from '@/utils/pricing';
+import { calculateDataProfit, educationProfitPerPin, type PricingSettings } from '@/utils/pricing';
 import { getRewardSpendEligibility } from '@/lib/rewards';
 import { TRANSACTION_PIN_PATTERN, verifyTransactionPin } from '@/lib/transaction-pin';
 
@@ -135,7 +135,7 @@ export async function POST(req: Request) {
             return acc;
         }, {}) || {};
 
-        const generalConfig = (config.general as { maintenance?: boolean; markup?: number | string } | undefined) || {};
+        const generalConfig = (config.general as (PricingSettings & { maintenance?: boolean }) | undefined) || {};
 
         if (generalConfig.maintenance) {
             return jsonError('System is currently under maintenance. Please try again later.', 503);
@@ -147,7 +147,7 @@ export async function POST(req: Request) {
         let discount = 0;
 
         if (serviceType === 'DATA' && planName) {
-            markupToApply = calculateDataProfit(planName);
+            markupToApply = calculateDataProfit(planName, generalConfig);
         } else if (serviceType === 'AIRTIME') {
             // Apply Discount for Airtime
             const purchaseAmount = Number(amount);
@@ -166,9 +166,8 @@ export async function POST(req: Request) {
             const purchaseAmount = Number(amount);
             discount = purchaseAmount * 0.005;
         } else if (serviceType === 'EDUCATION') {
-            // Apply ₦20 profit per pin
             const qty = Number(quantity || 1);
-            markupToApply = 20 * qty;
+            markupToApply = educationProfitPerPin(generalConfig) * qty;
         } else {
             // Fallback to DB markup for other services
             const globalMarkup = Number(generalConfig.markup || 0);
