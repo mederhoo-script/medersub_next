@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { calculateDataProfit, educationProfitPerPin, type PricingSettings } from '@/utils/pricing';
 
 export type ApiPayload = Record<string, unknown>;
 
@@ -17,8 +18,11 @@ export function apiKeyPrefix(apiKey: string) {
 
 export async function authenticatePublicApi(request: Request) {
     const authorization = request.headers.get('authorization');
-    const match = authorization?.match(/^Token\s+(.+)$/i);
-    const apiKey = match?.[1]?.trim();
+    // Support the documented Token scheme as well as the conventional Bearer
+    // and x-api-key forms used by API clients. This avoids rejecting valid
+    // user keys simply because a client library chooses a different header.
+    const match = authorization?.match(/^(?:Token|Bearer)\s+(.+)$/i);
+    const apiKey = (match?.[1] || request.headers.get('x-api-key') || request.headers.get('api-key'))?.trim();
     if (!apiKey || !apiKey.startsWith('ms_live_')) return null;
 
     const { data, error } = await supabaseAdmin
@@ -52,39 +56,61 @@ export function requirePositiveNumber(body: ApiPayload, name: string) {
     return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-type GeneralSettings = {
-    public_api_markup_percentage?: number | string;
-    global_markup_percentage?: number | string;
-    markup?: number | string;
+type GeneralSettings = PricingSettings & {
+    public_api_data_profit_up_to_1gb?: number | string;
+    public_api_data_profit_up_to_3gb?: number | string;
+    public_api_data_profit_up_to_5gb?: number | string;
+    public_api_data_profit_up_to_10gb?: number | string;
+    public_api_data_profit_over_10gb?: number | string;
+    public_api_education_profit_per_pin?: number | string;
 };
 
-export async function publicApiMarkupPercentage() {
+/** Returns the independent, fixed-profit configuration for public API plans. */
+export async function publicApiPricing(): Promise<PricingSettings> {
     const { data } = await supabaseAdmin.from('system_settings').select('value').eq('key', 'general').maybeSingle();
     const settings = (data?.value || {}) as GeneralSettings;
-    const markup = Number(settings.public_api_markup_percentage ?? settings.global_markup_percentage ?? settings.markup ?? 0);
-    return Number.isFinite(markup) && markup >= 0 ? markup : 0;
+    return {
+        data_profit_up_to_1gb: settings.public_api_data_profit_up_to_1gb ?? 10,
+        data_profit_up_to_3gb: settings.public_api_data_profit_up_to_3gb ?? 20,
+        data_profit_up_to_5gb: settings.public_api_data_profit_up_to_5gb ?? 30,
+        data_profit_up_to_10gb: settings.public_api_data_profit_up_to_10gb ?? 50,
+        data_profit_over_10gb: settings.public_api_data_profit_over_10gb ?? 100,
+        education_profit_per_pin: settings.public_api_education_profit_per_pin ?? 20,
+    };
 }
 
-function markedAmount(value: unknown, markup: number) {
+function markedAmount(value: unknown, profit: number) {
     const amount = Number(String(value).replace(/,/g, ''));
     if (!Number.isFinite(amount)) return value;
-    return Number((amount * (1 + markup / 100)).toFixed(2));
+    return Number((amount + profit).toFixed(2));
 }
 
-/** Replace provider plan prices with public selling prices without changing IDs or service shape. */
-export function applyServiceMarkup(response: unknown, markup: number) {
+/** Apply the admin's plan-tier and education profits to the public service catalogue. */
+export function applyServiceMarkup(response: unknown, pricing: PricingSettings) {
     if (!response || typeof response !== 'object') return response;
     const clone = structuredClone(response) as { data?: Record<string, unknown> };
     const data = clone.data;
     if (!data || typeof data !== 'object') return clone;
 
-    for (const group of ['dataPlans', 'cablePlans', 'education']) {
-        const plans = data[group];
-        if (!Array.isArray(plans)) continue;
-        data[group] = plans.map((plan) => {
-            if (!plan || typeof plan !== 'object' || !('amount' in plan)) return plan;
-            return { ...plan, amount: markedAmount((plan as ApiPayload).amount, markup) };
+    if (Array.isArray(data.dataPlans)) {
+        data.dataPlans = data.dataPlans.map((plan) => {
+            if (!plan || typeof plan !== 'object') return plan;
+            const item = plan as ApiPayload;
+            return 'amount' in item
+                ? { ...item, amount: markedAmount(item.amount, calculateDataProfit(String(item.dataPlan || ''), pricing)) }
+                : item;
         });
     }
+
+    if (Array.isArray(data.education)) {
+        data.education = data.education.map((plan) => {
+            if (!plan || typeof plan !== 'object') return plan;
+            const item = plan as ApiPayload;
+            return 'amount' in item
+                ? { ...item, amount: markedAmount(item.amount, educationProfitPerPin(pricing)) }
+                : item;
+        });
+    }
+
     return clone;
 }

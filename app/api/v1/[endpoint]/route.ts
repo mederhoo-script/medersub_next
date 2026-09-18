@@ -6,7 +6,7 @@ import {
     authenticatePublicApi,
     generatedRequestId,
     providerStatus,
-    publicApiMarkupPercentage,
+    publicApiPricing,
     requirePositiveNumber,
     requireString,
 } from '@/lib/public-api';
@@ -18,6 +18,21 @@ const purchases = new Set(['airtime', 'data', 'subcable', 'payelectric', 'educat
 
 function failed(message: string, status: number) {
     return NextResponse.json({ status: 'failed', message }, { status });
+}
+
+function publicServiceResponse(body: unknown, status: number) {
+    return NextResponse.json(body, {
+        status,
+        headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS' },
+    });
+}
+
+/** Service discovery and its selling prices are intentionally free to access. */
+export async function OPTIONS(_request: Request, context: { params: Promise<{ endpoint: string }> }) {
+    const { endpoint } = await context.params;
+    return endpoint === 'services'
+        ? new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, OPTIONS' } })
+        : new Response(null, { status: 404 });
 }
 
 async function bodyFor(request: Request): Promise<ApiPayload | null> {
@@ -36,8 +51,10 @@ export async function GET(request: Request, context: { params: Promise<{ endpoin
     if (endpoint !== 'services' && !await authenticatePublicApi(request)) return failed('Invalid or missing API key', 401);
 
     const response = endpoint === 'services' ? await publicInlomax.getServices() : await publicInlomax.getBalance();
-    const result = endpoint === 'services' ? applyServiceMarkup(response, await publicApiMarkupPercentage()) : response;
-    return NextResponse.json(result, { status: providerStatus(result) });
+    const result = endpoint === 'services' ? applyServiceMarkup(response, await publicApiPricing()) : response;
+    return endpoint === 'services'
+        ? publicServiceResponse(result, providerStatus(result))
+        : NextResponse.json(result, { status: providerStatus(result) });
 }
 
 export async function POST(request: Request, context: { params: Promise<{ endpoint: string }> }) {

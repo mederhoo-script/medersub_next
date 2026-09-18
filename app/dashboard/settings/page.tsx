@@ -50,6 +50,7 @@ export default function SettingsPage() {
   const [savingNotificationSettings, setSavingNotificationSettings] = useState(false)
   const [apiKey, setApiKey] = useState<string | null>(null)
   const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(null)
+  const [apiKeyStatus, setApiKeyStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
   const [rotatingApiKey, setRotatingApiKey] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -108,11 +109,18 @@ export default function SettingsPage() {
         }
         }
 
-        const apiKeyResponse = await fetch('/api/account/api-key', { credentials: 'include' })
-        if (apiKeyResponse.ok) {
-          const apiKeyPayload = await apiKeyResponse.json()
+        try {
+          const apiKeyResponse = await fetch('/api/account/api-key', { credentials: 'include' })
+          const apiKeyPayload = await apiKeyResponse.json().catch(() => null)
+          if (!apiKeyResponse.ok) throw new Error(apiKeyPayload?.message || 'Unable to load API key')
           setApiKey(apiKeyPayload?.data?.apiKey || null)
           setApiKeyPrefix(apiKeyPayload?.data?.apiKeyPrefix || null)
+          setApiKeyStatus('ready')
+        } catch (error) {
+          console.error('Failed to load API key', error)
+          setApiKey(null)
+          setApiKeyPrefix(null)
+          setApiKeyStatus('unavailable')
         }
 
         const notificationResponse = await fetch('/api/account/notifications', { credentials: 'include' })
@@ -146,7 +154,8 @@ export default function SettingsPage() {
   
 
   const handleRotateApiKey = async () => {
-    if (!confirm('Rotate your API key? Applications using the current key will stop working immediately.')) return
+    const creatingKey = apiKeyStatus === 'unavailable' || !apiKeyPrefix
+    if (!creatingKey && !confirm('Rotate your API key? Applications using the current key will stop working immediately.')) return
     setRotatingApiKey(true)
     try {
       const response = await fetch('/api/account/api-key', { method: 'POST', credentials: 'include' })
@@ -154,7 +163,8 @@ export default function SettingsPage() {
       if (!response.ok) throw new Error(payload.message || 'Unable to rotate API key')
       setApiKey(payload.data.apiKey)
       setApiKeyPrefix(payload.data.apiKeyPrefix)
-      setMessage({ type: 'success', text: 'API key rotated. Copy and save the new key now.' })
+      setApiKeyStatus('ready')
+      setMessage({ type: 'success', text: creatingKey ? 'API key created. Copy and save it now.' : 'API key rotated. Copy and save the new key now.' })
     } catch (err: unknown) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Unable to rotate API key' })
     } finally {
@@ -771,10 +781,10 @@ export default function SettingsPage() {
               <div>
                 <p className="font-medium text-gray-900">Developer API key</p>
                 <p className="text-sm text-gray-600">Use this key with <code>Authorization: Token …</code> for the Medersub API.</p>
-                {apiKey ? <div className="mt-3 flex flex-wrap items-center gap-2"><code className="rounded bg-gray-100 px-2 py-1 text-xs break-all">{apiKey}</code><button type="button" onClick={copyApiKey} className="text-sm font-medium text-blue-600 hover:text-blue-700">Copy</button></div> : <p className="mt-2 text-sm text-gray-500">Current key: {apiKeyPrefix || 'Loading…'}. For security, full keys are shown only when created or rotated.</p>}
+                {apiKey ? <div className="mt-3 flex flex-wrap items-center gap-2"><code className="rounded bg-gray-100 px-2 py-1 text-xs break-all">{apiKey}</code><button type="button" onClick={copyApiKey} className="text-sm font-medium text-blue-600 hover:text-blue-700">Copy</button></div> : apiKeyStatus === 'loading' ? <p className="mt-2 text-sm text-gray-500">Loading your API key…</p> : apiKeyStatus === 'unavailable' ? <p className="mt-2 text-sm text-amber-700">Your API key could not be loaded. Select “Create key” to try again.</p> : <p className="mt-2 text-sm text-gray-500">Current key: {apiKeyPrefix}. For security, full keys are shown only when created or rotated.</p>}
               </div>
             </div>
-            <button type="button" onClick={handleRotateApiKey} disabled={rotatingApiKey} className="shrink-0 rounded-lg border border-blue-600 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-60">{rotatingApiKey ? 'Rotating…' : 'Rotate key'}</button>
+            <button type="button" onClick={handleRotateApiKey} disabled={rotatingApiKey} className="shrink-0 rounded-lg border border-blue-600 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-60">{rotatingApiKey ? 'Saving…' : apiKeyStatus === 'unavailable' || !apiKeyPrefix ? 'Create key' : 'Rotate key'}</button>
           </div>
         </div>
 
