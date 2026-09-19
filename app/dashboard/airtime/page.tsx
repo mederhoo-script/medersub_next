@@ -10,9 +10,9 @@ import { useTransactionPin } from '@/components/dashboard/use-transaction-pin';
 
 const NETWORKS = [
     { id: 'MTN', name: 'MTN', color: 'bg-yellow-400', serviceId: '1' },
-    { id: 'AIRTEL', name: 'Airtel', color: 'bg-red-500', serviceId: '4' },
-    { id: 'GLO', name: 'Glo', color: 'bg-green-500', serviceId: '2' },
-    { id: '9MOBILE', name: '9mobile', color: 'bg-green-700', serviceId: '3' },
+    { id: 'AIRTEL', name: 'Airtel', color: 'bg-red-500', serviceId: '2' },
+    { id: 'GLO', name: 'Glo', color: 'bg-green-500', serviceId: '3' },
+    { id: '9MOBILE', name: '9mobile', color: 'bg-green-700', serviceId: '4' },
 ];
 
 export default function AirtimePage() {

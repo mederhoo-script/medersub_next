@@ -40,7 +40,12 @@ export const inlomax = {
 
     purchaseAirtime: async (mobileNumber: string, amount: number, serviceID: string) => {
         try {
-            const { data } = await api.post('/airtime', { mobileNumber, amount, serviceID });
+            const { data } = await api.post('/airtime', {
+                mobileNumber,
+                amount,
+                serviceID,
+                'request-id': `airtime-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            });
             return data;
         } catch (error: any) {
             console.error('Inlomax Airtime Error:', error.response?.data || error.message);
