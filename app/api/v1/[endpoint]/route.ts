@@ -11,6 +11,7 @@ import {
     requirePositiveNumber,
     requireString,
 } from '@/lib/public-api';
+import { customerFacingProviderResponse } from '@/lib/provider-messages';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,7 +53,7 @@ export async function GET(request: Request, context: { params: Promise<{ endpoin
     if (endpoint !== 'services' && !await authenticatePublicApi(request)) return failed('Invalid or missing API key', 401);
 
     const response = endpoint === 'services' ? await getConfiguredServices() : await publicInlomax.getBalance();
-    const result = endpoint === 'services' ? applyServiceMarkup(response, await publicApiPricing()) : response;
+    const result = endpoint === 'services' ? applyServiceMarkup(response, await publicApiPricing()) : customerFacingProviderResponse(response as { status?: unknown; message?: unknown });
     return endpoint === 'services'
         ? publicServiceResponse(result, providerStatus(result))
         : NextResponse.json(result, { status: providerStatus(result) });
@@ -67,6 +68,7 @@ export async function POST(request: Request, context: { params: Promise<{ endpoi
     if (!body) return failed('Request body must be a JSON object', 400);
     const serviceID = requireString(body, 'serviceID');
     const network = requireString(body, 'network') || undefined;
+    const portedNumber = body.ported_number !== false;
     // Preserve a supplied Inlomax-compatible request-id byte-for-byte; it is the
     // upstream idempotency reference used when a customer retries a purchase.
     const suppliedRequestId = body['request-id'];
@@ -83,7 +85,7 @@ export async function POST(request: Request, context: { params: Promise<{ endpoi
             if (!serviceID || !mobileNumber || !amount) return failed('serviceID, amount, and mobileNumber are required', 400);
             const route = await resolvePublicProvider('AIRTIME', serviceID, network);
             if (!route) return failed('Provider route is ambiguous. Include a valid network or refresh the service catalog.', 400);
-            response = await purchaseWithVtuProvider(route.provider, { serviceType: 'AIRTIME', network: route.network, serviceID, mobileNumber, amount, requestId: purchaseRequestId });
+            response = await purchaseWithVtuProvider(route.provider, { serviceType: 'AIRTIME', network: route.network, serviceID, mobileNumber, amount, requestId: purchaseRequestId, portedNumber });
             break;
         }
         case 'data': {
@@ -91,7 +93,7 @@ export async function POST(request: Request, context: { params: Promise<{ endpoi
             if (!serviceID || !mobileNumber) return failed('serviceID and mobileNumber are required', 400);
             const route = await resolvePublicProvider('DATA', serviceID, network);
             if (!route) return failed('Service ID was not found in the current catalog. Call GET /api/v1/services and use a current serviceID.', 400);
-            response = await purchaseWithVtuProvider(route.provider, { serviceType: 'DATA', network: route.network, serviceID, providerServiceID: route.providerServiceID, mobileNumber, requestId: purchaseRequestId });
+            response = await purchaseWithVtuProvider(route.provider, { serviceType: 'DATA', network: route.network, serviceID, providerServiceID: route.providerServiceID, mobileNumber, requestId: purchaseRequestId, portedNumber });
             break;
         }
         case 'validatecable': {
@@ -137,5 +139,5 @@ export async function POST(request: Request, context: { params: Promise<{ endpoi
             return failed('Endpoint not found', 404);
     }
 
-    return NextResponse.json(response, { status: providerStatus(response) });
+    return NextResponse.json(customerFacingProviderResponse(response as { status?: unknown; message?: unknown }), { status: providerStatus(response) });
 }

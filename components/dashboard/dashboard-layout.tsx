@@ -5,6 +5,7 @@ import MobileNav from '@/components/dashboard/mobile-nav';
 import PushNotificationBootstrap from '@/components/dashboard/push-notification-bootstrap';
 import PhoneNumberPrompt from '@/components/dashboard/phone-number-prompt';
 import DashboardBackButton from '@/components/dashboard/dashboard-back-button';
+import AnnouncementPopup from '@/components/dashboard/announcement-popup';
 
 export default function DashboardLayoutWrapper({ children }: { children: ReactNode }) {
     return (
@@ -24,6 +25,7 @@ export default function DashboardLayoutWrapper({ children }: { children: ReactNo
             <MobileNav />
             <PushNotificationBootstrap />
             <PhoneNumberPrompt />
+            <AnnouncementPopup />
         </div>
     );
 }

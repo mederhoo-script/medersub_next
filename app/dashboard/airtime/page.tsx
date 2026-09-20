@@ -36,6 +36,7 @@ export default function AirtimePage() {
     const [network, setNetwork] = useState(NETWORKS[0]);
     const [amount, setAmount] = useState('');
     const [phone, setPhone] = useState('');
+    const [portedNumber, setPortedNumber] = useState(true);
     const [beneficiaries, setBeneficiaries] = useState<string[]>([]);
     const [beneficiaryOpen, setBeneficiaryOpen] = useState(false);
     const { paymentSource, setPaymentSource } = useDefaultPaymentSource();
@@ -109,6 +110,7 @@ export default function AirtimePage() {
                 serviceID: network.serviceId,
                 network: network.id,
                 paymentSource,
+                portedNumber,
             };
 
             if (approvalType === 'biometric') {
@@ -235,6 +237,10 @@ export default function AirtimePage() {
                                 )) : <p className="px-4 py-3 text-sm text-gray-500">No previous airtime recipients yet.</p>}
                             </div>
                         )}
+                        <label className="mt-2 flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                            <span>Ported number</span>
+                            <input type="checkbox" checked={portedNumber} onChange={(e) => setPortedNumber(e.target.checked)} className="h-5 w-5 accent-blue-600" />
+                        </label>
                     </div>
 
                     {/* Amount */}

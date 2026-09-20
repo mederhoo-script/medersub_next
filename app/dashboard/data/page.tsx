@@ -87,6 +87,7 @@ export default function DataPage() {
     const [loadingPlans, setLoadingPlans] = useState(true);
     const [plan, setPlan] = useState<DataPlan | null>(null);
     const [phone, setPhone] = useState('');
+    const [portedNumber, setPortedNumber] = useState(true);
     const { paymentSource, setPaymentSource } = useDefaultPaymentSource();
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
@@ -255,6 +256,7 @@ export default function DataPage() {
                 network,
                 planName: plan.dataPlan,
                 paymentSource,
+                portedNumber,
             };
 
             if (approvalType === 'biometric') {
@@ -342,6 +344,10 @@ export default function DataPage() {
                             )) : <p className="px-7 py-4 text-sm text-[#687181]">No previous data recipients yet.</p>}
                         </div>
                     )}
+                    <label className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm text-[#454c58] shadow-sm">
+                        <span>Ported number</span>
+                        <input type="checkbox" checked={portedNumber} onChange={(e) => setPortedNumber(e.target.checked)} className="h-5 w-5 accent-[#0965df]" />
+                    </label>
 
                     <div>
                         <label className="mb-2 block text-sm font-medium text-[#687181] sm:mb-3 sm:text-[18px]">Select Network</label>

@@ -20,6 +20,7 @@ type PurchaseInput = {
     meterType?: number;
     quantity?: number;
     requestId?: string;
+    portedNumber?: boolean;
 };
 
 const DEFAULT_CONFIG: VtuProviderConfig = {
@@ -106,11 +107,23 @@ export async function purchaseWithVtuProvider(provider: string, input: PurchaseI
     const network = smeNetworkId(input.network);
     if (!network) return { status: 'error', message: `SMEAPI does not support network ${input.network || 'unknown'}.` };
     const ref = generatedVtuReference(input.serviceType);
-    if (input.serviceType === 'AIRTIME') return requestSmeApi('airtime', { network, phone: input.mobileNumber, amount: input.amount, ref: input.requestId || ref });
+    if (input.serviceType === 'AIRTIME') return requestSmeApi('airtime', {
+        network,
+        phone: input.mobileNumber,
+        amount: input.amount,
+        ported_number: input.portedNumber ?? true,
+        ref: input.requestId || ref,
+    });
     if (input.serviceType === 'DATA') {
         const dataPlanID = input.providerServiceID || input.serviceID;
         if (!dataPlanID) return { status: 'error', message: 'SMEAPI data-plan mapping is not configured for this product.' };
-        return requestSmeApi('data', { network, data_plan: dataPlanID, phone: input.mobileNumber, ref: input.requestId || ref });
+        return requestSmeApi('data', {
+            network,
+            data_plan: dataPlanID,
+            phone: input.mobileNumber,
+            ported_number: input.portedNumber ?? true,
+            ref: input.requestId || ref,
+        });
     }
     return { status: 'error', message: `SMEAPI routing is not configured for ${input.serviceType}.` };
 }

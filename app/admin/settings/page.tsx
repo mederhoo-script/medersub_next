@@ -189,6 +189,53 @@ export default function SettingsPage() {
                         </div>
                     </div>
 
+                    <div className="border-t border-gray-100 pt-6">
+                        <h3 className="mb-2 text-lg font-medium text-gray-900">User announcement popup</h3>
+                        <p className="mb-4 text-sm text-gray-500">Publish an important message that appears once for users. Increase the version whenever you want a dismissed announcement to appear again.</p>
+                        <div className="space-y-3">
+                            <label className="flex items-center gap-3 text-sm font-medium text-gray-700">
+                                <input type="checkbox" checked={config.announcement?.enabled === true} onChange={(e) => setConfig({ ...config, announcement: { ...(config.announcement || {}), enabled: e.target.checked } })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                Show announcement to users
+                            </label>
+                            <label className="block text-sm font-medium text-gray-700">Title
+                                <input type="text" maxLength={80} value={config.announcement?.title || ''} onChange={(e) => setConfig({ ...config, announcement: { ...(config.announcement || {}), title: e.target.value } })} placeholder="Scheduled maintenance" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+                            </label>
+                            <label className="block text-sm font-medium text-gray-700">Message
+                                <textarea maxLength={500} rows={4} value={config.announcement?.message || ''} onChange={(e) => setConfig({ ...config, announcement: { ...(config.announcement || {}), message: e.target.value } })} placeholder="Tell users what they need to know..." className="mt-1 w-full resize-y rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+                            </label>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <label className="block text-sm font-medium text-gray-700">Button label (optional)
+                                    <input type="text" maxLength={32} value={config.announcement?.actionLabel || ''} onChange={(e) => setConfig({ ...config, announcement: { ...(config.announcement || {}), actionLabel: e.target.value } })} placeholder="Read more" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+                                </label>
+                                <label className="block text-sm font-medium text-gray-700">Button URL (optional)
+                                    <input type="url" value={config.announcement?.actionUrl || ''} onChange={(e) => setConfig({ ...config, announcement: { ...(config.announcement || {}), actionUrl: e.target.value } })} placeholder="https://..." className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+                                </label>
+                            </div>
+                            <label className="block text-sm font-medium text-gray-700">Announcement version
+                                <input type="text" maxLength={40} value={config.announcement?.version || '1'} onChange={(e) => setConfig({ ...config, announcement: { ...(config.announcement || {}), version: e.target.value } })} placeholder="1" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
+                            </label>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <label className="block text-sm font-medium text-gray-700">Display frequency
+                                    <select value={config.announcement?.displayMode || 'once'} onChange={(e) => setConfig({ ...config, announcement: { ...(config.announcement || {}), displayMode: e.target.value } })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                                        <option value="once">Once per version</option>
+                                        <option value="every_visit">Every visit</option>
+                                    </select>
+                                </label>
+                                <label className="block text-sm font-medium text-gray-700">Target page (optional)
+                                    <select value={config.announcement?.targetPath || ''} onChange={(e) => setConfig({ ...config, announcement: { ...(config.announcement || {}), targetPath: e.target.value } })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500">
+                                        <option value="">All dashboard pages</option>
+                                        <option value="/dashboard">Dashboard home</option>
+                                        <option value="/dashboard/data">Data</option>
+                                        <option value="/dashboard/airtime">Airtime</option>
+                                        <option value="/dashboard/cable">Cable TV</option>
+                                        <option value="/dashboard/electricity">Electricity</option>
+                                        <option value="/dashboard/history">History</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="pt-6 border-t border-gray-100">
                         <h3 className="text-lg font-medium text-gray-900 mb-2">Data plan profit (₦)</h3>
                         <p className="mb-4 text-sm text-gray-500">These amounts replace the previous hard-coded data-plan profits for website purchases.</p>

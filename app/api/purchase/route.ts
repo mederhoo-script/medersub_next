@@ -7,6 +7,7 @@ import { calculateDataProfit, educationProfitPerPin, type PricingSettings } from
 import { getRewardSpendEligibility } from '@/lib/rewards';
 import { TRANSACTION_PIN_PATTERN, verifyTransactionPin } from '@/lib/transaction-pin';
 import { normalizeVtuProviderConfig, purchaseWithVtuProvider, selectVtuProvider, type VtuServiceType } from '@/lib/vtu-providers';
+import { customerFacingProviderMessage, providerResponseMessage } from '@/lib/provider-messages';
 
 type SystemSettingRow = { key: string; value: unknown };
 
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         const { userId, serviceType, amount, mobileNumber, serviceID, network, planName, meterType, quantity, paymentSource, transactionPin, biometricToken } = body;
+        const portedNumber = body.portedNumber !== false;
         const selectedPaymentSource = paymentSource === 'reward' ? 'reward' : 'wallet';
         const authenticatedUserId = await getAuthenticatedUserId();
 
@@ -294,21 +296,17 @@ export async function POST(req: Request) {
             amount: Number(amount),
             meterType: meterType || 1,
             quantity: Number(quantity || 1),
+            portedNumber,
         });
 
         if (apiResponse.status === 'processing') {
-            return NextResponse.json({ ok: true, status: 'processing', message: apiResponse.message || 'Purchase is processing. Please check the transaction status before retrying.' }, { status: 202 });
+            return NextResponse.json({ ok: true, status: 'processing', message: providerResponseMessage(apiResponse, 'Purchase is processing. Please check the transaction status before retrying.') }, { status: 202 });
         }
 
         if (apiResponse.status !== 'success') {
             console.error('Provider API Failed:', apiResponse); // Log full response
-            let errorMsg = apiResponse.message || 'Provider failed';
-            const lowerMsg = errorMsg.toLowerCase();
-            // Masking provider empty wallet error
-            if (lowerMsg.includes('insufficient funds') || lowerMsg.includes('insuffucient funds')) {
-                errorMsg = 'Service temporarily unavailable. Please try again later.';
-            }
-            return jsonError(errorMsg, 502, { debug: apiResponse });
+            const errorMsg = providerResponseMessage(apiResponse, 'Service temporarily unavailable. Please try again later.');
+            return jsonError(errorMsg, 502);
         }
 
         // 3. Deduct Total Charge from selected balance
