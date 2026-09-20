@@ -38,13 +38,13 @@ export const inlomax = {
         }
     },
 
-    purchaseAirtime: async (mobileNumber: string, amount: number, serviceID: string) => {
+    purchaseAirtime: async (mobileNumber: string, amount: number, serviceID: string, requestId?: string) => {
         try {
             const { data } = await api.post('/airtime', {
                 mobileNumber,
                 amount,
                 serviceID,
-                'request-id': `airtime-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+                'request-id': requestId || `airtime-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
             });
             return data;
         } catch (error: any) {
@@ -77,9 +77,9 @@ export const inlomax = {
         }
     },
 
-    purchaseCable: async (iucNum: string, serviceID: string) => {
+    purchaseCable: async (iucNum: string, serviceID: string, requestId?: string) => {
         try {
-            const { data } = await api.post('/subcable', { iucNum, serviceID });
+            const { data } = await api.post('/subcable', { iucNum, serviceID, 'request-id': requestId || `cable-${Date.now()}-${Math.random().toString(36).slice(2, 10)}` });
             return data;
         } catch (error: any) {
             return error.response?.data || { status: 'error', message: 'Failed to subscribe cable' };
@@ -95,9 +95,9 @@ export const inlomax = {
         }
     },
 
-    payElectricity: async (meterNum: string, serviceID: string, meterType: number, amount: number) => {
+    payElectricity: async (meterNum: string, serviceID: string, meterType: number, amount: number, requestId?: string) => {
         try {
-            const { data } = await api.post('/payelectric', { meterNum, serviceID, meterType, amount });
+            const { data } = await api.post('/payelectric', { meterNum, serviceID, meterType, amount, 'request-id': requestId || `electricity-${Date.now()}-${Math.random().toString(36).slice(2, 10)}` });
             return data;
         } catch (error: any) {
             return error.response?.data || { status: 'error', message: 'Failed to pay electricity' };
@@ -113,9 +113,9 @@ export const inlomax = {
         }
     },
 
-    purchaseEducation: async (serviceID: string, quantity: number) => {
+    purchaseEducation: async (serviceID: string, quantity: number, requestId?: string) => {
         try {
-            const { data } = await api.post('/education', { serviceID, quantity });
+            const { data } = await api.post('/education', { serviceID, quantity, 'request-id': requestId || `education-${Date.now()}-${Math.random().toString(36).slice(2, 10)}` });
             return data;
         } catch (error: any) {
             console.error('Inlomax Education Error:', error.response?.data || error.message);

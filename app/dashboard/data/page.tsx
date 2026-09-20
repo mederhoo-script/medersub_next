@@ -12,6 +12,8 @@ import { calculateDataProfit, type PricingSettings } from '@/utils/pricing';
 
 type DataPlan = {
     serviceID: string;
+    provider?: string;
+    providerServiceID?: string;
     network: string;
     dataPlan: string;
     amount: number | string;
@@ -196,7 +198,10 @@ export default function DataPage() {
                     const planType = (item.dataType || '').trim().toLowerCase();
                     const match = normalizedSmeApiPlans.find((candidate: { network: string; name: string; type: string }) =>
                         candidate.network === networkName && candidate.name === planName && (!planType || !candidate.type || candidate.type === planType));
-                    return match ? { ...item, network: networkName, smeapiServiceID: match.id } : { ...item, network: networkName };
+                    const providerServiceID = item.providerServiceID || (item.provider === 'smeapi' ? item.serviceID : undefined);
+                    return match
+                        ? { ...item, network: networkName, providerServiceID: providerServiceID || match.id, smeapiServiceID: match.id }
+                        : { ...item, network: networkName, providerServiceID };
                 });
                 setAllDataPlans(plansWithSmeApiIds);
                 setNetwork((current) => current || normalizeNetworkKey(plansWithSmeApiIds[0]?.network) || '');
@@ -246,7 +251,7 @@ export default function DataPage() {
                 amount: Number(plan.amount.toString().replace(/,/g, '')),
                 mobileNumber: phone,
                 serviceID: plan.serviceID,
-                providerServiceID: plan.smeapiServiceID,
+                providerServiceID: plan.smeapiServiceID || plan.providerServiceID,
                 network,
                 planName: plan.dataPlan,
                 paymentSource,

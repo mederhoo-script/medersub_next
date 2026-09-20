@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { publicInlomax } from '@/lib/inlomax';
-import { getConfiguredServices } from '@/lib/vtu-providers';
+import { getConfiguredServices, purchaseWithVtuProvider, resolvePublicProvider, type VtuServiceType } from '@/lib/vtu-providers';
 import {
     ApiPayload,
     applyServiceMarkup,
@@ -66,6 +66,7 @@ export async function POST(request: Request, context: { params: Promise<{ endpoi
     const body = await bodyFor(request);
     if (!body) return failed('Request body must be a JSON object', 400);
     const serviceID = requireString(body, 'serviceID');
+    const network = requireString(body, 'network') || undefined;
     // Preserve a supplied Inlomax-compatible request-id byte-for-byte; it is the
     // upstream idempotency reference used when a customer retries a purchase.
     const suppliedRequestId = body['request-id'];
@@ -80,13 +81,17 @@ export async function POST(request: Request, context: { params: Promise<{ endpoi
             const mobileNumber = requireString(body, 'mobileNumber');
             const amount = requirePositiveNumber(body, 'amount');
             if (!serviceID || !mobileNumber || !amount) return failed('serviceID, amount, and mobileNumber are required', 400);
-            response = await publicInlomax.purchaseAirtime(mobileNumber, amount, serviceID, purchaseRequestId);
+            const route = await resolvePublicProvider('AIRTIME', serviceID, network);
+            if (!route) return failed('Provider route is ambiguous. Include a valid network or refresh the service catalog.', 400);
+            response = await purchaseWithVtuProvider(route.provider, { serviceType: 'AIRTIME', network: route.network, serviceID, mobileNumber, amount, requestId: purchaseRequestId });
             break;
         }
         case 'data': {
             const mobileNumber = requireString(body, 'mobileNumber');
             if (!serviceID || !mobileNumber) return failed('serviceID and mobileNumber are required', 400);
-            response = await publicInlomax.purchaseData(mobileNumber, serviceID, purchaseRequestId);
+            const route = await resolvePublicProvider('DATA', serviceID, network);
+            if (!route) return failed('Service ID was not found in the current catalog. Call GET /api/v1/services and use a current serviceID.', 400);
+            response = await purchaseWithVtuProvider(route.provider, { serviceType: 'DATA', network: route.network, serviceID, providerServiceID: route.providerServiceID, mobileNumber, requestId: purchaseRequestId });
             break;
         }
         case 'validatecable': {

@@ -19,6 +19,7 @@ type PurchaseInput = {
     amount?: number;
     meterType?: number;
     quantity?: number;
+    requestId?: string;
 };
 
 const DEFAULT_CONFIG: VtuProviderConfig = {
@@ -95,20 +96,21 @@ function smeNetworkId(network?: string) {
 
 export async function purchaseWithVtuProvider(provider: string, input: PurchaseInput) {
     if (provider === 'inlomax') {
-        if (input.serviceType === 'AIRTIME') return inlomax.purchaseAirtime(input.mobileNumber, input.amount || 0, input.serviceID);
-        if (input.serviceType === 'DATA') return inlomax.purchaseData(input.mobileNumber, input.serviceID, generatedVtuReference(input.serviceType));
-        if (input.serviceType === 'CABLE') return inlomax.purchaseCable(input.mobileNumber, input.serviceID);
-        if (input.serviceType === 'ELECTRICITY') return inlomax.payElectricity(input.mobileNumber, input.serviceID, input.meterType || 1, input.amount || 0);
-        return inlomax.purchaseEducation(input.serviceID, input.quantity || 1);
+        if (input.serviceType === 'AIRTIME') return inlomax.purchaseAirtime(input.mobileNumber, input.amount || 0, input.serviceID, input.requestId);
+        if (input.serviceType === 'DATA') return inlomax.purchaseData(input.mobileNumber, input.serviceID, input.requestId || generatedVtuReference(input.serviceType));
+        if (input.serviceType === 'CABLE') return inlomax.purchaseCable(input.mobileNumber, input.serviceID, input.requestId);
+        if (input.serviceType === 'ELECTRICITY') return inlomax.payElectricity(input.mobileNumber, input.serviceID, input.meterType || 1, input.amount || 0, input.requestId);
+        return inlomax.purchaseEducation(input.serviceID, input.quantity || 1, input.requestId);
     }
 
     const network = smeNetworkId(input.network);
     if (!network) return { status: 'error', message: `SMEAPI does not support network ${input.network || 'unknown'}.` };
     const ref = generatedVtuReference(input.serviceType);
-    if (input.serviceType === 'AIRTIME') return requestSmeApi('airtime', { network, phone: input.mobileNumber, amount: input.amount, ref });
+    if (input.serviceType === 'AIRTIME') return requestSmeApi('airtime', { network, phone: input.mobileNumber, amount: input.amount, ref: input.requestId || ref });
     if (input.serviceType === 'DATA') {
-        if (!input.providerServiceID) return { status: 'error', message: 'SMEAPI data-plan mapping is not configured for this product.' };
-        return requestSmeApi('data', { network, data_plan: input.providerServiceID, phone: input.mobileNumber, ref });
+        const dataPlanID = input.providerServiceID || input.serviceID;
+        if (!dataPlanID) return { status: 'error', message: 'SMEAPI data-plan mapping is not configured for this product.' };
+        return requestSmeApi('data', { network, data_plan: dataPlanID, phone: input.mobileNumber, ref: input.requestId || ref });
     }
     return { status: 'error', message: `SMEAPI routing is not configured for ${input.serviceType}.` };
 }
@@ -144,12 +146,58 @@ export async function getConfiguredServices() {
             const provider = selectVtuProvider(providerConfig, 'DATA', network);
             return provider === 'smeapi'
                 ? smeApiPlans.filter((plan) => normalizeNetworkName(plan.network) === network)
-                : inlomaxPlans.filter((plan: { network?: string }) => normalizeNetworkName(plan.network) === network);
+                : inlomaxPlans.filter((plan: { network?: string }) => normalizeNetworkName(plan.network) === network).map((plan) => ({ ...plan, provider: 'inlomax' }));
         });
         data.data.providerConfig = providerConfig;
     }
 
     return data;
+}
+
+type PublicProviderResolution = {
+    provider: string;
+    network?: string;
+    providerServiceID?: string;
+};
+
+/** Resolves a public API purchase from server configuration and catalog data. */
+export async function resolvePublicProvider(serviceType: VtuServiceType, serviceID: string, network?: string): Promise<PublicProviderResolution | null> {
+    const { data: providerSetting } = await supabaseAdmin
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'vtu_provider_config')
+        .maybeSingle();
+    const providerConfig = normalizeVtuProviderConfig(providerSetting?.value);
+    const normalizedNetwork = normalizeNetworkName(network);
+
+    if (serviceType === 'DATA') {
+        const catalog = await getConfiguredServices();
+        const plans = Array.isArray(catalog?.data?.dataPlans) ? catalog.data.dataPlans : [];
+        const matches = plans.filter((plan: { serviceID?: unknown; network?: string }) => String(plan.serviceID) === serviceID && (!normalizedNetwork || normalizeNetworkName(plan.network) === normalizedNetwork));
+        if (matches.length !== 1) return null;
+        const plan = matches[0] as { provider?: string; providerServiceID?: string; network?: string; serviceID?: string };
+        const selectedNetwork = normalizeNetworkName(plan.network);
+        return {
+            provider: plan.provider || selectVtuProvider(providerConfig, serviceType, selectedNetwork),
+            network: selectedNetwork,
+            providerServiceID: plan.providerServiceID || plan.serviceID,
+        };
+    }
+
+    if (normalizedNetwork) {
+        return { provider: selectVtuProvider(providerConfig, serviceType, normalizedNetwork), network: normalizedNetwork };
+    }
+
+    if (serviceType === 'AIRTIME') {
+        const networkByServiceID: Record<string, string> = { '1': 'MTN', '2': 'AIRTEL', '3': 'GLO', '4': 'T2MOBILE' };
+        const knownNetwork = networkByServiceID[serviceID];
+        if (knownNetwork) return { provider: selectVtuProvider(providerConfig, serviceType, knownNetwork), network: knownNetwork };
+        const providers = ['MTN', 'AIRTEL', 'GLO', 'T2MOBILE'].map((item) => selectVtuProvider(providerConfig, serviceType, item));
+        if (new Set(providers).size !== 1) return null;
+        return { provider: providers[0] };
+    }
+
+    return { provider: selectVtuProvider(providerConfig, serviceType) };
 }
 
 export async function getSmeApiAccount() {
