@@ -1,5 +1,6 @@
 import { inlomax } from '@/lib/inlomax';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getSmeApiAccount } from '@/lib/vtu-providers';
 import { CreditCard, Users, Activity, ExternalLink, Plus, RefreshCw, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -7,20 +8,24 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboardPage() {
     // 1. Fetch Data in Parallel
-    const [inlomaxData, userStats, walletStats, recentTx] = await Promise.all([
+    const [inlomaxData, smeApiData, userStats, walletStats, recentTx] = await Promise.all([
         inlomax.getBalance(),
+        getSmeApiAccount(),
         supabaseAdmin.from('profiles').select('*', { count: 'exact', head: true }),
         supabaseAdmin.from('wallets').select('balance'),
         supabaseAdmin.from('transactions').select('*, profiles(email)').order('created_at', { ascending: false }).limit(5)
     ]);
 
     const providerBalance = inlomaxData?.data?.funds || 0;
+    const smeApiPayload = smeApiData?.data && typeof smeApiData.data === 'object' ? smeApiData.data : smeApiData;
+    const smeApiBalance = Number((smeApiPayload?.balance ?? smeApiPayload?.wallet_balance ?? smeApiPayload?.funds ?? 0).replace(/,/g, ''));
+    const smeApiAvailable = smeApiData?.status === 'success';
     const userCount = userStats.count || 0;
     const totalUserWallet = walletStats.data?.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0) || 0;
     const transactions = recentTx.data || [];
 
     // Low Balance Warning
-    const lowBalance = providerBalance < 5000;
+    const lowBalance = smeApiBalance < 3000 || providerBalance < 5000;
 
     return (
         <div className="space-y-8">
@@ -36,11 +41,11 @@ export default async function AdminDashboardPage() {
             {lowBalance && (
                 <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex items-center">
                     <AlertTriangle className="h-5 w-5 text-red-500 mr-3" />
-                    <p className="text-red-700 font-medium">Low Provider Balance! Please top up your Inlomax account to prevent service failures.</p>
+                    <p className="text-red-700 font-medium">Low Balance! Please top up your accounts to prevent service failures.</p>
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {/* Cards */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                     <div className="flex justify-between items-start">
@@ -57,6 +62,24 @@ export default async function AdminDashboardPage() {
                     <div className="mt-4 text-xs text-gray-400 flex items-center">
                         <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
                         Connected to Inlomax
+                    </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-sm font-medium text-gray-500">SMEAPI Balance</p>
+                            <h3 className="text-3xl font-bold text-gray-900 mt-2">
+                                {smeApiAvailable ? `₦${smeApiBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : 'Unavailable'}
+                            </h3>
+                        </div>
+                        <div className="p-3 bg-indigo-50 rounded-lg text-indigo-600">
+                            <Activity className="h-6 w-6" />
+                        </div>
+                    </div>
+                    <div className="mt-4 text-xs text-gray-400 flex items-center">
+                        <span className={`w-2 h-2 rounded-full mr-2 ${smeApiAvailable ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                        {smeApiAvailable ? 'Connected to SMEAPI' : 'Configure SMEAPI_API_KEY'}
                     </div>
                 </div>
 

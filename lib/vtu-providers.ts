@@ -123,6 +123,24 @@ export async function getSmeApiDataPlans() {
     return response.json().catch(() => null);
 }
 
+export async function getSmeApiAccount() {
+    const apiKey = process.env.SMEAPI_API_KEY;
+    if (!apiKey) return { status: 'error', message: 'SMEAPI is not configured on the server.' };
+
+    try {
+        const response = await fetch('https://smeapi.com.ng/api/user/', {
+            headers: { Authorization: `Token ${apiKey}`, Accept: 'application/json' },
+            cache: 'no-store',
+        });
+        const result = await response.json().catch(() => ({ status: 'error', message: 'SMEAPI returned an invalid response.' }));
+        if (!response.ok) return { status: 'error', message: result?.detail || result?.message || 'Unable to fetch SMEAPI account.' };
+        return result;
+    } catch (error) {
+        console.error('SMEAPI account error:', error);
+        return { status: 'error', message: 'Unable to connect to SMEAPI.' };
+    }
+}
+
 export function normalizeSmeApiDataPlans(response: unknown) {
     const payload = response && typeof response === 'object' && !Array.isArray(response) ? response as Record<string, unknown> : {};
     const nestedData = payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
