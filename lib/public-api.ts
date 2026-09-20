@@ -84,6 +84,7 @@ type GeneralSettings = PricingSettings & {
     public_api_data_profit_up_to_10gb?: number | string;
     public_api_data_profit_over_10gb?: number | string;
     public_api_education_profit_per_pin?: number | string;
+    public_api_data_profit_by_network?: PricingSettings['data_profit_by_network'];
 };
 
 /** Returns the independent, fixed-profit configuration for public API plans. */
@@ -97,6 +98,7 @@ export async function publicApiPricing(): Promise<PricingSettings> {
         data_profit_up_to_10gb: settings.public_api_data_profit_up_to_10gb ?? 50,
         data_profit_over_10gb: settings.public_api_data_profit_over_10gb ?? 100,
         education_profit_per_pin: settings.public_api_education_profit_per_pin ?? 20,
+        data_profit_by_network: settings.public_api_data_profit_by_network ?? {},
     };
 }
 
@@ -118,7 +120,7 @@ export function applyServiceMarkup(response: unknown, pricing: PricingSettings) 
             if (!plan || typeof plan !== 'object') return plan;
             const item = plan as ApiPayload;
             return 'amount' in item
-                ? { ...item, amount: markedAmount(item.amount, calculateDataProfit(String(item.dataPlan || ''), pricing)) }
+                ? { ...item, amount: markedAmount(item.amount, calculateDataProfit(String(item.dataPlan || ''), pricing, String(item.network || item.network_name || ''))) }
                 : item;
         });
     }

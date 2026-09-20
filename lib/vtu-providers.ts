@@ -1,5 +1,6 @@
 import { randomBytes } from 'crypto';
 import { inlomax } from '@/lib/inlomax';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export type VtuServiceType = 'AIRTIME' | 'DATA' | 'CABLE' | 'ELECTRICITY' | 'EDUCATION';
 
@@ -121,6 +122,34 @@ export async function getSmeApiDataPlans() {
     });
     if (!response.ok) return null;
     return response.json().catch(() => null);
+}
+
+/** Builds the service catalog using the provider routes configured by an admin. */
+export async function getConfiguredServices() {
+    const data = await inlomax.getServices();
+    const { data: providerSetting } = await supabaseAdmin
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'vtu_provider_config')
+        .maybeSingle();
+    const providerConfig = normalizeVtuProviderConfig(providerSetting?.value);
+    const networks = ['MTN', 'GLO', 'AIRTEL', 'T2MOBILE'];
+    const needsSmeApi = networks.some((network) => selectVtuProvider(providerConfig, 'DATA', network) === 'smeapi');
+    const smeApiDataPlans = needsSmeApi ? await getSmeApiDataPlans() : null;
+    const inlomaxPlans = Array.isArray(data?.data?.dataPlans) ? data.data.dataPlans : [];
+    const smeApiPlans = normalizeSmeApiDataPlans(smeApiDataPlans);
+
+    if (data?.data) {
+        data.data.dataPlans = networks.flatMap((network) => {
+            const provider = selectVtuProvider(providerConfig, 'DATA', network);
+            return provider === 'smeapi'
+                ? smeApiPlans.filter((plan) => normalizeNetworkName(plan.network) === network)
+                : inlomaxPlans.filter((plan: { network?: string }) => normalizeNetworkName(plan.network) === network);
+        });
+        data.data.providerConfig = providerConfig;
+    }
+
+    return data;
 }
 
 export async function getSmeApiAccount() {

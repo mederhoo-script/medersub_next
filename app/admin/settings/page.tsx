@@ -278,6 +278,41 @@ export default function SettingsPage() {
                         <label className="mt-4 block text-sm font-medium text-gray-700">Education profit per exam PIN (₦)
                             <input type="number" min="0" step="0.01" value={config.public_api_education_profit_per_pin ?? 20} onChange={(e) => setConfig({ ...config, public_api_education_profit_per_pin: Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
                         </label>
+                        <div className="mt-6 border-t border-gray-100 pt-6">
+                            <h4 className="mb-2 text-sm font-medium text-gray-700">Network-specific data profit overrides</h4>
+                            <p className="mb-4 text-sm text-gray-500">Set distinct profit values for each network and data size returned by <code>/api/v1/services</code>. Leave a field at 0 to inherit the public API global tier value.</p>
+                            <div className="space-y-4">
+                                {networkProfitNetworks.map((network) => (
+                                    <div key={`public-${network}`} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                                        <h5 className="mb-3 text-sm font-semibold text-gray-800">{network}</h5>
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            {networkProfitBuckets.map(([bucket, label]) => (
+                                                <label key={`public-${network}-${bucket}`} className="block text-xs font-medium text-gray-700">
+                                                    {label}
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={Number(config.public_api_data_profit_by_network?.[network]?.[bucket] ?? 0)}
+                                                        onChange={(e) => {
+                                                            const value = e.target.value === '' ? 0 : Number(e.target.value);
+                                                            const nextByNetwork = { ...(config.public_api_data_profit_by_network || {}) };
+                                                            const networkSettings = { ...(nextByNetwork[network] || {}) };
+                                                            if (value === 0) delete networkSettings[bucket];
+                                                            else networkSettings[bucket] = value;
+                                                            if (Object.keys(networkSettings).length === 0) delete nextByNetwork[network];
+                                                            else nextByNetwork[network] = networkSettings;
+                                                            setConfig({ ...config, public_api_data_profit_by_network: nextByNetwork });
+                                                        }}
+                                                        className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                                                    />
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="pt-6 border-t border-gray-100">

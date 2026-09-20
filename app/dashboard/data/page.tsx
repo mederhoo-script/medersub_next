@@ -225,8 +225,8 @@ export default function DataPage() {
     const visiblePlans = category === 'HOT'
         ? hotPlans
         : category
-            ? plans.filter((item) => item.dataType?.trim() === category && !isSocialBundle(item.dataPlan) && normalizeHotSizeMb(item.dataPlan) >= 500 && normalizeHotSizeMb(item.dataPlan) <= 3072)
-            : plans.filter((item) => !isSocialBundle(item.dataPlan) && normalizeHotSizeMb(item.dataPlan) >= 500 && normalizeHotSizeMb(item.dataPlan) <= 3072);
+            ? plans.filter((item) => item.dataType?.trim() === category)
+            : plans;
 
     const submitPurchase = async (approvalType: 'pin' | 'biometric') => {
         if (!plan) return;

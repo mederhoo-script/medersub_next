@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { publicInlomax } from '@/lib/inlomax';
+import { getConfiguredServices } from '@/lib/vtu-providers';
 import {
     ApiPayload,
     applyServiceMarkup,
@@ -50,7 +51,7 @@ export async function GET(request: Request, context: { params: Promise<{ endpoin
     // Service discovery is deliberately public so developers can browse plans before signing up.
     if (endpoint !== 'services' && !await authenticatePublicApi(request)) return failed('Invalid or missing API key', 401);
 
-    const response = endpoint === 'services' ? await publicInlomax.getServices() : await publicInlomax.getBalance();
+    const response = endpoint === 'services' ? await getConfiguredServices() : await publicInlomax.getBalance();
     const result = endpoint === 'services' ? applyServiceMarkup(response, await publicApiPricing()) : response;
     return endpoint === 'services'
         ? publicServiceResponse(result, providerStatus(result))
