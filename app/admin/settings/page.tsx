@@ -9,6 +9,20 @@ export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [profitData, setProfitData] = useState<any | null>(null);
+    const [vtuConfig, setVtuConfig] = useState({
+        globalProvider: 'inlomax',
+        enabledProviders: ['inlomax'] as string[],
+        routes: {} as Record<string, Record<string, string>>,
+    });
+
+    const networkProfitBuckets = [
+        ['up_to_1gb', 'Up to 1GB'],
+        ['up_to_3gb', '1GB - 3GB'],
+        ['up_to_5gb', '3GB - 5GB'],
+        ['up_to_10gb', '5GB - 10GB'],
+        ['over_10gb', '10GB+'],
+    ] as const;
+    const networkProfitNetworks = ['MTN', 'AIRTEL', 'GLO', 'T2MOBILE'];
 
     useEffect(() => {
         const fetchSettings = async () => {
@@ -29,6 +43,11 @@ export default function SettingsPage() {
                         } catch { /* Stored value may already be plain text. */ }
                         setActiveProvider(savedProvider === 'korapay' ? 'korapay' : savedProvider === 'none' || savedProvider === 'manual' ? 'none' : 'monnify');
                     }
+                    if (data.vtu_provider_config) setVtuConfig({
+                        globalProvider: data.vtu_provider_config.globalProvider === 'smeapi' ? 'smeapi' : 'inlomax',
+                        enabledProviders: Array.isArray(data.vtu_provider_config.enabledProviders) && data.vtu_provider_config.enabledProviders.includes('smeapi') ? ['inlomax', 'smeapi'] : ['inlomax'],
+                        routes: data.vtu_provider_config.routes || {},
+                    });
                 } else {
                     const text = await res.text();
                     console.error('Settings returned non-JSON response', text);
@@ -68,7 +87,7 @@ export default function SettingsPage() {
         e.preventDefault();
         setSaving(true);
         try {
-            const [generalRes, providerRes] = await Promise.all([
+            const [generalRes, providerRes, vtuRes] = await Promise.all([
                 fetch('/api/admin/settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -79,13 +98,19 @@ export default function SettingsPage() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ key: 'payment_provider', value: activeProvider })
                 })
+                , fetch('/api/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: 'vtu_provider_config', value: vtuConfig })
+                })
             ]);
 
             const failedGeneral = !generalRes.ok;
             const failedProvider = !providerRes.ok;
+            const failedVtu = !vtuRes.ok;
 
-            if (failedGeneral || failedProvider) {
-                const text = await Promise.all([generalRes.text().catch(() => ''), providerRes.text().catch(() => '')]);
+            if (failedGeneral || failedProvider || failedVtu) {
+                const text = await Promise.all([generalRes.text().catch(() => ''), providerRes.text().catch(() => ''), vtuRes.text().catch(() => '')]);
                 console.error('Save settings failed', text);
                 alert('Failed to save settings');
                 return;
@@ -111,6 +136,19 @@ export default function SettingsPage() {
         } finally {
             setSaving(false);
         }
+    };
+
+    const changeGlobalVtuProvider = (provider: string) => {
+        setVtuConfig((current) => {
+            const routes = Object.fromEntries(Object.entries(current.routes).map(([type, networkRoutes]) => [
+                type,
+                Object.fromEntries(Object.entries(networkRoutes).map(([network, selectedProvider]) => [
+                    network,
+                    selectedProvider === current.globalProvider ? provider : selectedProvider,
+                ])),
+            ]));
+            return { ...current, globalProvider: provider, routes };
+        });
     };
 
     if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin" /></div>;
@@ -171,6 +209,48 @@ export default function SettingsPage() {
                     </div>
 
                     <div className="pt-6 border-t border-gray-100">
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Network-specific data profit overrides</h3>
+                        <p className="mb-4 text-sm text-gray-500">Set distinct profit values for each network and data size. Leave a field at 0 to inherit the global tier value.</p>
+                        <div className="space-y-4">
+                            {networkProfitNetworks.map((network) => (
+                                <div key={network} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                                    <h4 className="mb-3 text-sm font-semibold text-gray-800">{network}</h4>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        {networkProfitBuckets.map(([bucket, label]) => (
+                                            <label key={`${network}-${bucket}`} className="block text-xs font-medium text-gray-700">
+                                                {label}
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={Number(config.data_profit_by_network?.[network]?.[bucket] ?? 0)}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value === '' ? 0 : Number(e.target.value);
+                                                        const nextByNetwork = { ...(config.data_profit_by_network || {}) };
+                                                        const networkSettings = { ...(nextByNetwork[network] || {}) };
+                                                        if (value === 0) {
+                                                            delete networkSettings[bucket];
+                                                        } else {
+                                                            networkSettings[bucket] = value;
+                                                        }
+                                                        if (Object.keys(networkSettings).length === 0) {
+                                                            delete nextByNetwork[network];
+                                                        } else {
+                                                            nextByNetwork[network] = networkSettings;
+                                                        }
+                                                        setConfig({ ...config, data_profit_by_network: nextByNetwork });
+                                                    }}
+                                                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                                                />
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-100">
                         <h3 className="text-lg font-medium text-gray-900 mb-2">Education profit (₦)</h3>
                         <label className="block text-sm font-medium text-gray-700">Profit per exam PIN
                             <input type="number" min="0" step="0.01" value={config.education_profit_per_pin ?? 20} onChange={(e) => setConfig({ ...config, education_profit_per_pin: Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
@@ -198,6 +278,34 @@ export default function SettingsPage() {
                         <label className="mt-4 block text-sm font-medium text-gray-700">Education profit per exam PIN (₦)
                             <input type="number" min="0" step="0.01" value={config.public_api_education_profit_per_pin ?? 20} onChange={(e) => setConfig({ ...config, public_api_education_profit_per_pin: Number(e.target.value) })} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 focus:ring-2 focus:ring-blue-500" />
                         </label>
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-100">
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">VTU Provider Routing</h3>
+                        <p className="mb-4 text-sm text-gray-500">Choose the default provider and override it for specific Airtime or Data networks. SMEAPI must be configured with the server-side SMEAPI_API_KEY.</p>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Global provider</label>
+                        <select value={vtuConfig.globalProvider} onChange={(e) => changeGlobalVtuProvider(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2">
+                            <option value="inlomax">Inlomax</option>
+                            {vtuConfig.enabledProviders.includes('smeapi') && <option value="smeapi">SMEAPI</option>}
+                        </select>
+                        <div className="mt-4 flex gap-5 text-sm">
+                            {['inlomax', 'smeapi'].map((provider) => (
+                                <label key={provider} className="flex items-center gap-2">
+                                    <input type="checkbox" checked={vtuConfig.enabledProviders.includes(provider)} disabled={provider === 'inlomax'} onChange={(e) => setVtuConfig({ ...vtuConfig, enabledProviders: e.target.checked ? [...new Set([...vtuConfig.enabledProviders, provider])] : vtuConfig.enabledProviders.filter((item) => item !== provider), globalProvider: provider === 'smeapi' && !e.target.checked ? 'inlomax' : vtuConfig.globalProvider })} />
+                                    {provider === 'inlomax' ? 'Enable Inlomax' : 'Enable SMEAPI'}
+                                </label>
+                            ))}
+                        </div>
+                        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            {['AIRTIME', 'DATA'].map((type) => ['MTN', 'GLO', 'AIRTEL', 'T2MOBILE'].map((network) => (
+                                <label key={`${type}-${network}`} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                                    <span>{network} {type.toLowerCase()}</span>
+                                    <select value={vtuConfig.routes[type]?.[network] || vtuConfig.globalProvider} onChange={(e) => setVtuConfig({ ...vtuConfig, routes: { ...vtuConfig.routes, [type]: { ...(vtuConfig.routes[type] || {}), [network]: e.target.value } } })} className="rounded border border-gray-200 px-2 py-1 text-xs">
+                                        {vtuConfig.enabledProviders.map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+                                    </select>
+                                </label>
+                            ))) }
+                        </div>
                     </div>
 
                     <div className="pt-6 border-t border-gray-100">

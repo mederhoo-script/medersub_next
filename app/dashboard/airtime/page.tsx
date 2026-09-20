@@ -1,7 +1,9 @@
 'use client';
 import { useState } from 'react';
+import { useEffect } from 'react';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
-import { Smartphone, Loader2, ArrowLeft, Fingerprint, AlertTriangle } from 'lucide-react';
+import { Smartphone, Loader2, ArrowLeft, Fingerprint, AlertTriangle, ChevronRight, Contact, UserRound } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SpendingBalances from '@/components/dashboard/spending-balances';
@@ -9,11 +11,24 @@ import { useDefaultPaymentSource } from '@/components/dashboard/use-default-paym
 import { useTransactionPin } from '@/components/dashboard/use-transaction-pin';
 
 const NETWORKS = [
-    { id: 'MTN', name: 'MTN', color: 'bg-yellow-400', serviceId: '1' },
-    { id: 'AIRTEL', name: 'Airtel', color: 'bg-red-500', serviceId: '2' },
-    { id: 'GLO', name: 'Glo', color: 'bg-green-500', serviceId: '3' },
-    { id: '9MOBILE', name: '9mobile', color: 'bg-green-700', serviceId: '4' },
+    { id: 'MTN', name: 'MTN', serviceId: '1', logo: '/assets/mtn.jpeg' },
+    { id: 'AIRTEL', name: 'Airtel', serviceId: '2', logo: '/assets/airtel-mobile.png' },
+    { id: 'GLO', name: 'Glo', serviceId: '3', logo: '/assets/glo.png' },
+    { id: 'T2MOBILE', name: 'T2mobile', serviceId: '4', logo: '/assets/t2mobile.png' },
 ];
+
+type AirtimeTransaction = {
+    type?: string | null;
+    status?: string | null;
+    meta?: {
+        mobile?: string | null;
+        mobileNumber?: string | null;
+        mobile_number?: string | null;
+        phone?: string | null;
+        recipient?: string | null;
+        service_type?: string | null;
+    } | null;
+};
 
 export default function AirtimePage() {
     const { requestPin, requestBiometricApproval, PinDialog, biometricSupported, biometricSupportMessage } = useTransactionPin();
@@ -21,9 +36,42 @@ export default function AirtimePage() {
     const [network, setNetwork] = useState(NETWORKS[0]);
     const [amount, setAmount] = useState('');
     const [phone, setPhone] = useState('');
+    const [beneficiaries, setBeneficiaries] = useState<string[]>([]);
+    const [beneficiaryOpen, setBeneficiaryOpen] = useState(false);
     const { paymentSource, setPaymentSource } = useDefaultPaymentSource();
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+
+    useEffect(() => {
+        const fetchBeneficiaries = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('type, status, meta')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Failed to fetch airtime beneficiaries:', error.message);
+                return;
+            }
+
+            const numbers = (data as AirtimeTransaction[] | null || [])
+                .filter((transaction) => {
+                    const service = transaction.meta?.service_type || transaction.type;
+                    return service?.toUpperCase().includes('AIRTIME') && transaction.status?.toLowerCase() !== 'failed';
+                })
+                .map((transaction) => transaction.meta?.mobile || transaction.meta?.mobileNumber || transaction.meta?.mobile_number || transaction.meta?.phone || transaction.meta?.recipient)
+                .map((mobile) => mobile?.trim())
+                .filter((mobile): mobile is string => Boolean(mobile));
+
+            setBeneficiaries(Array.from(new Set(numbers)));
+        };
+
+        fetchBeneficiaries();
+    }, []);
 
     // Calculate discounted amount
     const getDiscountedAmount = (amt: string, netId: string) => {
@@ -149,7 +197,9 @@ export default function AirtimePage() {
                                         : 'border-transparent bg-gray-50 hover:bg-gray-100'
                                         }`}
                                 >
-                                    <div className={`h-8 w-8 rounded-full ${net.color} mb-2`} />
+                                    <div className="relative mb-2 h-8 w-8 overflow-hidden rounded-full border border-gray-200 bg-white">
+                                        <Image src={net.logo} alt={`${net.name} logo`} fill sizes="32px" className="object-contain" />
+                                    </div>
                                     <span className="text-xs font-semibold">{net.name}</span>
                                 </button>
                             ))}
@@ -170,6 +220,21 @@ export default function AirtimePage() {
                                 placeholder="08012345678"
                             />
                         </div>
+                        <button type="button" onClick={() => setBeneficiaryOpen((open) => !open)} className="mt-2 flex w-full items-center gap-3 rounded-xl bg-gray-50 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-100">
+                            <UserRound className="h-5 w-5 text-blue-600" />
+                            <span className="flex-1">{phone && beneficiaries.includes(phone) ? phone : 'Select Beneficiary'}</span>
+                            <ChevronRight className={`h-5 w-5 text-gray-400 transition-transform ${beneficiaryOpen ? 'rotate-90' : ''}`} />
+                        </button>
+                        {beneficiaryOpen && (
+                            <div className="overflow-hidden rounded-b-xl bg-white shadow-sm">
+                                {beneficiaries.length > 0 ? beneficiaries.map((mobile) => (
+                                    <button key={mobile} type="button" onClick={() => { setPhone(mobile); setBeneficiaryOpen(false); }} className="block w-full border-b border-gray-100 px-4 py-3 text-left text-sm text-gray-700 last:border-0 hover:bg-blue-50">
+                                        <Contact className="mr-2 inline-block h-4 w-4 text-blue-600" />
+                                        {mobile}
+                                    </button>
+                                )) : <p className="px-4 py-3 text-sm text-gray-500">No previous airtime recipients yet.</p>}
+                            </div>
+                        )}
                     </div>
 
                     {/* Amount */}

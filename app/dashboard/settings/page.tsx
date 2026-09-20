@@ -6,7 +6,7 @@ import type { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
-import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut, Bell, ShieldAlert } from 'lucide-react'
+import { Mail, Lock, Unlink2, CheckCircle2, AlertCircle, LogOut, Bell, ShieldAlert, Copy, Check } from 'lucide-react'
 import { enrollTransactionBiometrics } from '@/components/dashboard/biometric-transaction'
 import { disableCurrentNativePushToken, registerNativePushNotifications } from '@/components/dashboard/native-push-notifications'
     
@@ -52,6 +52,8 @@ export default function SettingsPage() {
   const [apiKeyPrefix, setApiKeyPrefix] = useState<string | null>(null)
   const [apiKeyStatus, setApiKeyStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading')
   const [rotatingApiKey, setRotatingApiKey] = useState(false)
+  const [apiKeyCopied, setApiKeyCopied] = useState(false)
+  const [showRotateApiKeyDialog, setShowRotateApiKeyDialog] = useState(false)
 
   const [formData, setFormData] = useState({
     email: '',
@@ -153,9 +155,8 @@ export default function SettingsPage() {
   }, [hasTransactionPin, loading])
   
 
-  const handleRotateApiKey = async () => {
+  const rotateApiKey = async () => {
     const creatingKey = apiKeyStatus === 'unavailable' || !apiKeyPrefix
-    if (!creatingKey && !confirm('Rotate your API key? Applications using the current key will stop working immediately.')) return
     setRotatingApiKey(true)
     try {
       const response = await fetch('/api/account/api-key', { method: 'POST', credentials: 'include' })
@@ -164,6 +165,7 @@ export default function SettingsPage() {
       setApiKey(payload.data.apiKey)
       setApiKeyPrefix(payload.data.apiKeyPrefix)
       setApiKeyStatus('ready')
+      setShowRotateApiKeyDialog(false)
       setMessage({ type: 'success', text: creatingKey ? 'API key created. Copy and save it now.' : 'API key rotated. Copy and save the new key now.' })
     } catch (err: unknown) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Unable to rotate API key' })
@@ -172,10 +174,25 @@ export default function SettingsPage() {
     }
   }
 
+  const handleRotateApiKey = () => {
+    const creatingKey = apiKeyStatus === 'unavailable' || !apiKeyPrefix
+    if (creatingKey) {
+      void rotateApiKey()
+      return
+    }
+    setShowRotateApiKeyDialog(true)
+  }
+
   const copyApiKey = async () => {
     if (!apiKey) return
-    await navigator.clipboard.writeText(apiKey)
-    setMessage({ type: 'success', text: 'API key copied.' })
+    try {
+      await navigator.clipboard.writeText(apiKey)
+      setApiKeyCopied(true)
+      setMessage({ type: 'success', text: 'API key copied.' })
+      window.setTimeout(() => setApiKeyCopied(false), 2000)
+    } catch {
+      setMessage({ type: 'error', text: 'Could not copy the API key. Please copy it manually.' })
+    }
   }
 
   const handleUnlinkTelegram = async () => {
@@ -424,6 +441,7 @@ export default function SettingsPage() {
             <div className="flex items-start gap-3">
               <ShieldAlert className="mt-1 h-5 w-5 text-purple-600" />
               <div>
+
                 <h2 className="font-semibold text-purple-950">Admin access</h2>
                 <p className="text-sm text-purple-700">Open the admin panel from here if the bottom mobile admin tab is hard to reach.</p>
               </div>
@@ -781,7 +799,7 @@ export default function SettingsPage() {
               <div>
                 <p className="font-medium text-gray-900">Developer API key</p>
                 <p className="text-sm text-gray-600">Use this key with <code>Authorization: Token …</code> for the Medersub API.</p>
-                {apiKey ? <div className="mt-3 flex flex-wrap items-center gap-2"><code className="rounded bg-gray-100 px-2 py-1 text-xs break-all">{apiKey}</code><button type="button" onClick={copyApiKey} className="text-sm font-medium text-blue-600 hover:text-blue-700">Copy</button></div> : apiKeyStatus === 'loading' ? <p className="mt-2 text-sm text-gray-500">Loading your API key…</p> : apiKeyStatus === 'unavailable' ? <p className="mt-2 text-sm text-amber-700">Your API key could not be loaded. Select “Create key” to try again.</p> : <p className="mt-2 text-sm text-gray-500">Current key: {apiKeyPrefix}. For security, full keys are shown only when created or rotated.</p>}
+                {apiKey ? <div className="mt-3 flex flex-wrap items-center gap-2"><code className="rounded bg-gray-100 px-2 py-1 text-xs break-all">{apiKey}</code><button type="button" onClick={copyApiKey} className={`inline-flex items-center gap-1 text-sm font-medium ${apiKeyCopied ? 'text-green-600' : 'text-blue-600 hover:text-blue-700'}`} aria-label={apiKeyCopied ? 'API key copied' : 'Copy API key'}>{apiKeyCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{apiKeyCopied ? 'Copied' : 'Copy'}</button></div> : apiKeyStatus === 'loading' ? <p className="mt-2 text-sm text-gray-500">Loading your API key…</p> : apiKeyStatus === 'unavailable' ? <p className="mt-2 text-sm text-amber-700">Your API key could not be loaded. Select “Create key” to try again.</p> : <p className="mt-2 text-sm text-gray-500">Current key: {apiKeyPrefix}. For security, full keys are shown only when created or rotated.</p>}
               </div>
             </div>
             <button type="button" onClick={handleRotateApiKey} disabled={rotatingApiKey} className="shrink-0 rounded-lg border border-blue-600 px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-60">{rotatingApiKey ? 'Saving…' : apiKeyStatus === 'unavailable' || !apiKeyPrefix ? 'Create key' : 'Rotate key'}</button>
@@ -831,6 +849,26 @@ export default function SettingsPage() {
       </div>
 
       
+
+      {showRotateApiKeyDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" role="dialog" aria-modal="true" aria-labelledby="rotate-api-key-title">
+            <div className="flex items-start gap-3">
+              <div className="rounded-full bg-amber-100 p-2 text-amber-700">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 id="rotate-api-key-title" className="text-lg font-semibold text-gray-900">Rotate API key?</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-600">Your current key will stop working immediately. Any application using it must be updated with the new key.</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" onClick={() => setShowRotateApiKeyDialog(false)} disabled={rotatingApiKey} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60">Cancel</button>
+              <button type="button" onClick={() => void rotateApiKey()} disabled={rotatingApiKey} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60">{rotatingApiKey ? 'Rotating…' : 'Rotate key'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Logout Button */}
       <button

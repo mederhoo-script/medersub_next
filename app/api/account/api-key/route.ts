@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { apiKeyPrefix, createApiKey, hashApiKey } from '@/lib/public-api';
+import { apiKeyPrefix, createApiKey, decryptApiKey, encryptApiKey, hashApiKey } from '@/lib/public-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ async function createOrRotateApiKey(userId: string, supabase: Awaited<ReturnType
     const apiKey = createApiKey();
     const { data, error } = await supabase
         .from('profiles')
-        .update({ api_key_hash: hashApiKey(apiKey), api_key_prefix: apiKeyPrefix(apiKey) })
+        .update({ api_key_hash: hashApiKey(apiKey), api_key_encrypted: encryptApiKey(apiKey), api_key_prefix: apiKeyPrefix(apiKey) })
         .eq('id', userId)
         .select('id')
         .maybeSingle();
@@ -41,21 +41,27 @@ export async function GET() {
 
     const { data, error } = await supabase
         .from('profiles')
-        .select('api_key_hash, api_key_prefix')
+        .select('api_key_hash, api_key_encrypted, api_key_prefix')
         .eq('id', userId)
         .single();
-    if (error || !data) return NextResponse.json({ status: 'failed', message: 'Unable to load API key' }, { status: 500 });
+    if (error || !data) {
+        console.error('Unable to load API key profile columns:', error);
+        return NextResponse.json({ status: 'failed', message: 'Unable to load API key' }, { status: 500 });
+    }
 
-    // Keys assigned by the database trigger/backfill cannot be revealed because
-    // only their hashes are stored. Replace that placeholder on first visit so
-    // every user can actually copy a usable key from Account Settings.
-    if (data.api_key_hash && data.api_key_prefix !== 'Active API key') {
-        return NextResponse.json({ status: 'success', data: { apiKey: null, apiKeyPrefix: data.api_key_prefix || 'Active API key' } });
+    if (data.api_key_encrypted) {
+        try {
+            const apiKey = decryptApiKey(data.api_key_encrypted);
+            return NextResponse.json({ status: 'success', data: { apiKey, apiKeyPrefix: apiKeyPrefix(apiKey) } });
+        } catch (decryptError) {
+            console.error('Unable to decrypt API key:', decryptError);
+            return NextResponse.json({ status: 'failed', message: 'Unable to load API key' }, { status: 500 });
+        }
     }
 
     const apiKey = await createOrRotateApiKey(userId, supabase);
     if (!apiKey) return NextResponse.json({ status: 'failed', message: 'Unable to create API key' }, { status: 500 });
-    return NextResponse.json({ status: 'success', message: 'Your API key is ready. Save it now; it cannot be shown again.', data: { apiKey, apiKeyPrefix: apiKeyPrefix(apiKey) } });
+    return NextResponse.json({ status: 'success', message: 'Your API key is ready.', data: { apiKey, apiKeyPrefix: apiKeyPrefix(apiKey) } });
 }
 
 /** Rotate the caller's public key. Display the new key once, then store it safely. */

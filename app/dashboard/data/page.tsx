@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Contact, Loader2, ArrowLeft, ChevronLeft, ChevronRight, Fingerprint, UserRound } from 'lucide-react';
+import { Contact, Loader2, ArrowLeft, ChevronLeft, ChevronRight, Fingerprint, UserRound, Flame } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -17,6 +17,7 @@ type DataPlan = {
     amount: number | string;
     validity?: string;
     dataType?: string;
+    smeapiServiceID?: string;
 };
 
 type DataTransaction = {
@@ -37,20 +38,46 @@ const networkStyles: Record<string, string> = {
     MTN: 'bg-[#ffc900]',
     AIRTEL: 'bg-[#e51b2b]',
     GLO: 'bg-[#138b43]',
+    T2MOBILE: 'bg-[#006633]',
 };
 
 const networkLogos: Record<string, string> = {
     MTN: '/assets/mtn.jpeg',
     AIRTEL: '/assets/airtel-mobile.png',
     GLO: '/assets/glo.png',
-    '9MOBILE': '/assets/9mobile.png',
+    T2MOBILE: '/assets/t2mobile.png',
+};
+
+const normalizeNetworkKey = (value?: string) => {
+    const cleaned = String(value ?? '').trim().replace(/[_\-\s]+/g, '').toUpperCase();
+    if (!cleaned) return '';
+    if (cleaned.includes('T2MOBILE') || cleaned.includes('9MOBILE') || cleaned.includes('9MO') || cleaned.includes('T2M')) return 'T2MOBILE';
+    return cleaned;
+};
+
+const normalizeHotSizeMb = (value?: string) => {
+    const text = String(value ?? '').trim().toLowerCase();
+    if (!text) return 0;
+    const match = text.match(/(\d+(?:\.\d+)?)\s*(mb|gb|g|m)/);
+    if (!match) return 0;
+    const amount = Number(match[1]);
+    const unit = match[2];
+    return unit === 'gb' || unit === 'g' ? amount * 1024 : amount;
+};
+
+const isSocialBundle = (value?: string) => /social/i.test(String(value ?? ''));
+const isHotDataPlan = (item: DataPlan) => {
+    if (!item || isSocialBundle(item.dataPlan)) return false;
+    const price = Number(item.amount ?? 0);
+    if (price >= 800) return false;
+    const sizeMb = normalizeHotSizeMb(item.dataPlan);
+    return sizeMb >= 500 && sizeMb <= 3072;
 };
 
 const displayName = (value: string) => value.replace(/[-_]/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 export default function DataPage() {
     const { requestPin, requestBiometricApproval, PinDialog, biometricSupported, biometricSupportMessage } = useTransactionPin();
-    // ... (rest of imports and state)
     const router = useRouter();
     const [pricing, setPricing] = useState<PricingSettings>({});
     const [network, setNetwork] = useState('MTN');
@@ -62,7 +89,8 @@ export default function DataPage() {
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
     const [allDataPlans, setAllDataPlans] = useState<DataPlan[]>([]);
-    const networks = Array.from(new Set(allDataPlans.map((item) => item.network?.trim()).filter(Boolean)))
+    const defaultNetworkOrder = ['MTN', 'AIRTEL', 'GLO', 'T2MOBILE'];
+    const networks = Array.from(new Set([...defaultNetworkOrder, ...allDataPlans.map((item) => normalizeNetworkKey(item.network)).filter(Boolean)]))
         .sort((first, second) => {
             const firstIndex = Object.keys(networkLogos).indexOf(first.toUpperCase());
             const secondIndex = Object.keys(networkLogos).indexOf(second.toUpperCase());
@@ -71,8 +99,9 @@ export default function DataPage() {
             if (secondIndex === -1) return -1;
             return firstIndex - secondIndex;
         });
-    const categories = Array.from(new Set(plans.map((item) => item.dataType?.trim()).filter(Boolean))) as string[];
-    const [category, setCategory] = useState('');
+    const hotPlans = (plans || []).filter(isHotDataPlan).sort((a, b) => Number(a.amount) - Number(b.amount));
+    const categories = ['HOT', ...Array.from(new Set(plans.map((item) => item.dataType?.trim()).filter(Boolean)))].filter(Boolean) as string[];
+    const [category, setCategory] = useState('HOT');
     const [beneficiaries, setBeneficiaries] = useState<string[]>([]);
     const [beneficiaryOpen, setBeneficiaryOpen] = useState(false);
     const categoryScrollerRef = useRef<HTMLDivElement>(null);
@@ -154,8 +183,23 @@ export default function DataPage() {
             console.log(response);
             if (response.status === 'success' && response.data && response.data.dataPlans) {
                 const fetchedPlans = response.data.dataPlans as DataPlan[];
-                setAllDataPlans(fetchedPlans);
-                setNetwork((current) => current || fetchedPlans[0]?.network?.trim().toUpperCase() || '');
+                const smeApiPlans = Array.isArray(response.data.smeApiDataPlans) ? response.data.smeApiDataPlans : [];
+                const normalizedSmeApiPlans = smeApiPlans.map((item: any) => ({
+                    id: String(item.id ?? item.serviceID ?? item.data_plan ?? item.plan_id ?? ''),
+                    network: normalizeNetworkKey(String(item.network ?? item.network_name ?? '')),
+                    name: String(item.name ?? item.dataPlan ?? item.plan_name ?? item.plan ?? '').trim().toLowerCase(),
+                    type: String(item.dataType ?? item.data_type ?? item.type ?? '').trim().toLowerCase(),
+                })).filter((item: { id: string; network: string; name: string }) => item.id && item.network);
+                const plansWithSmeApiIds = fetchedPlans.map((item) => {
+                    const networkName = normalizeNetworkKey(item.network);
+                    const planName = item.dataPlan.trim().toLowerCase();
+                    const planType = (item.dataType || '').trim().toLowerCase();
+                    const match = normalizedSmeApiPlans.find((candidate: { network: string; name: string; type: string }) =>
+                        candidate.network === networkName && candidate.name === planName && (!planType || !candidate.type || candidate.type === planType));
+                    return match ? { ...item, network: networkName, smeapiServiceID: match.id } : { ...item, network: networkName };
+                });
+                setAllDataPlans(plansWithSmeApiIds);
+                setNetwork((current) => current || normalizeNetworkKey(plansWithSmeApiIds[0]?.network) || '');
             }
         } catch (error) {
             console.error("Failed to fetch services", error);
@@ -167,13 +211,22 @@ export default function DataPage() {
     // Filter plans
     useEffect(() => {
         if (allDataPlans.length > 0 && network) {
-            const filtered = allDataPlans.filter((p) => p.network?.trim().toUpperCase() === network);
+            const normalizedNetwork = normalizeNetworkKey(network);
+            const filtered = allDataPlans.filter((p) => normalizeNetworkKey(p.network) === normalizedNetwork);
             setPlans(filtered);
-            setCategory((current) => current && filtered.some((item) => item.dataType?.trim() === current) ? current : filtered[0]?.dataType?.trim() || '');
+            setCategory((current) => {
+                if (current === 'HOT') return 'HOT';
+                if (current && filtered.some((item) => item.dataType?.trim() === current)) return current;
+                return filtered.length > 0 ? 'HOT' : '';
+            });
         }
     }, [network, allDataPlans]);
 
-    const visiblePlans = category ? plans.filter((item) => item.dataType?.trim() === category) : plans;
+    const visiblePlans = category === 'HOT'
+        ? hotPlans
+        : category
+            ? plans.filter((item) => item.dataType?.trim() === category && !isSocialBundle(item.dataPlan) && normalizeHotSizeMb(item.dataPlan) >= 500 && normalizeHotSizeMb(item.dataPlan) <= 3072)
+            : plans.filter((item) => !isSocialBundle(item.dataPlan) && normalizeHotSizeMb(item.dataPlan) >= 500 && normalizeHotSizeMb(item.dataPlan) <= 3072);
 
     const submitPurchase = async (approvalType: 'pin' | 'biometric') => {
         if (!plan) return;
@@ -193,6 +246,7 @@ export default function DataPage() {
                 amount: Number(plan.amount.toString().replace(/,/g, '')),
                 mobileNumber: phone,
                 serviceID: plan.serviceID,
+                providerServiceID: plan.smeapiServiceID,
                 network,
                 planName: plan.dataPlan,
                 paymentSource,
@@ -311,7 +365,11 @@ export default function DataPage() {
                                 <ChevronLeft className="h-4 w-4" />
                             </button>}
                             <div ref={categoryScrollerRef} className="scrollbar-none flex min-w-0 flex-1 gap-2 overflow-x-auto pb-0">
-                                {categories.map((item) => <button key={item} type="button" onClick={() => { setCategory(item); setPlan(null); }} className={`shrink-0 rounded-full px-3 py-2 text-xs font-medium sm:px-7 sm:py-3 sm:text-[16px] ${category === item ? 'bg-[#0965df] text-white' : 'bg-white text-[#454c58]'}`}>{displayName(item)}</button>)}
+                                {categories.map((item) => (
+                                    <button key={item} type="button" onClick={() => { setCategory(item); setPlan(null); }} className={`shrink-0 rounded-full px-3 py-2 text-xs font-medium sm:px-7 sm:py-3 sm:text-[16px] ${category === item ? 'bg-[#0965df] text-white' : 'bg-white text-[#454c58]'}`}>
+                                        {item === 'HOT' ? <span className="inline-flex items-center gap-1"><Flame className="h-3 w-3 text-red-500" /> HOT</span> : displayName(item)}
+                                    </button>
+                                ))}
                             </div>
                             {categoryScrollState.canScrollRight && <button type="button" onClick={() => scrollCategories('right')} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white shadow-sm hover:text-[#0965df]" aria-label="Next plan categories">
                                 <ChevronRight className="h-4 w-4" />
@@ -320,7 +378,7 @@ export default function DataPage() {
                         <div className="h-5"></div>
                         {loadingPlans ? <div className="flex justify-center py-10"><Loader2 className="h-7 w-7 animate-spin text-blue-600" /></div> : <div className="grid grid-cols-2 gap-3 sm:gap-4">
                             {visiblePlans.map((item) => {
-                                const amount = Number(item.amount.toString().replace(/,/g, '')) + calculateDataProfit(item.dataPlan, pricing);
+                                const amount = Number(item.amount.toString().replace(/,/g, '')) + calculateDataProfit(item.dataPlan, pricing, network);
                                 const selected = plan?.serviceID === item.serviceID;
                                 return <button key={item.serviceID} type="button" onClick={() => setPlan(item)} className={`min-h-[135px] rounded-2xl bg-blue-100 p-3 text-left transition-all sm:min-h-[165px] sm:rounded-[21px] ${selected ? 'border-2 border-[#0965df] bg-cyan-300' : 'border-2.5 border-transparent bg-white'}`}>
                                     <span className="block text-sm text-[#202632] sm:text-[17px]">{item.validity || 'Flexible'}</span>

@@ -54,9 +54,13 @@ export const inlomax = {
         }
     },
 
-    purchaseData: async (mobileNumber: string, serviceID: string) => {
+    purchaseData: async (mobileNumber: string, serviceID: string, requestId?: string) => {
         try {
-            const { data } = await api.post('/data', { mobileNumber, serviceID });
+            const { data } = await api.post('/data', {
+                mobileNumber,
+                serviceID,
+                'request-id': requestId || `data-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            });
             return data;
         } catch (error: any) {
             console.error('Inlomax Data Error:', error.response?.data || error.message);

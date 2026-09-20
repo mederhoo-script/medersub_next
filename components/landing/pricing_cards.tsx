@@ -29,7 +29,7 @@ const networks = [
         gradient: 'from-[#2ECC71] to-[#27AE60]'
     },
     {
-        name: '9mobile',
+        name: 'T2mobile',
         color: '#006633',
         textColor: 'text-white',
         plans: ['1GB - ₦300', '2GB - ₦600', '5GB - ₦1,450'],
@@ -95,7 +95,7 @@ export default function PricingCards() {
                                     ${network.name === 'MTN' ? 'bg-[#FFCC00] text-black hover:bg-[#E6B800]' :
                                             network.name === 'Airtel' ? 'bg-[#E40000] text-white hover:bg-[#B30000]' :
                                                 network.name === 'Glo' ? 'bg-[#2ECC71] text-white hover:bg-[#27AE60]' :
-                                                    network.name === '9mobile' ? 'bg-[#006633] text-white hover:bg-[#004D26]' :
+                                                    network.name === 'T2mobile' ? 'bg-[#006633] text-white hover:bg-[#004D26]' :
                                                         'bg-slate-100 text-slate-900 hover:bg-slate-200'}`}>
                                         Buy Now
                                     </button>

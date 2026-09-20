@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { calculateDataProfit, educationProfitPerPin, type PricingSettings } from '@/utils/pricing';
 
@@ -14,6 +14,27 @@ export function createApiKey() {
 
 export function apiKeyPrefix(apiKey: string) {
     return `${apiKey.slice(0, 16)}…${apiKey.slice(-4)}`;
+}
+
+function apiKeyEncryptionKey() {
+    const secret = process.env.API_KEY_ENCRYPTION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!secret) throw new Error('API key encryption secret is not configured');
+    return createHash('sha256').update(secret).digest();
+}
+
+export function encryptApiKey(apiKey: string) {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', apiKeyEncryptionKey(), iv);
+    const encrypted = Buffer.concat([cipher.update(apiKey, 'utf8'), cipher.final()]);
+    return [iv.toString('base64url'), cipher.getAuthTag().toString('base64url'), encrypted.toString('base64url')].join('.');
+}
+
+export function decryptApiKey(value: string) {
+    const [ivValue, tagValue, encryptedValue] = value.split('.');
+    if (!ivValue || !tagValue || !encryptedValue) throw new Error('Invalid encrypted API key');
+    const decipher = createDecipheriv('aes-256-gcm', apiKeyEncryptionKey(), Buffer.from(ivValue, 'base64url'));
+    decipher.setAuthTag(Buffer.from(tagValue, 'base64url'));
+    return Buffer.concat([decipher.update(Buffer.from(encryptedValue, 'base64url')), decipher.final()]).toString('utf8');
 }
 
 export async function authenticatePublicApi(request: Request) {

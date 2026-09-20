@@ -24,6 +24,7 @@ export async function GET() {
             data_profit_up_to_10gb: settings.data_profit_up_to_10gb ?? 50,
             data_profit_over_10gb: settings.data_profit_over_10gb ?? 100,
             education_profit_per_pin: settings.education_profit_per_pin ?? 20,
+            data_profit_by_network: settings.data_profit_by_network ?? {},
         } satisfies PricingSettings,
     });
 }

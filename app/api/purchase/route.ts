@@ -3,10 +3,10 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 // Force rebuild
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { inlomax } from '@/lib/inlomax';
 import { calculateDataProfit, educationProfitPerPin, type PricingSettings } from '@/utils/pricing';
 import { getRewardSpendEligibility } from '@/lib/rewards';
 import { TRANSACTION_PIN_PATTERN, verifyTransactionPin } from '@/lib/transaction-pin';
+import { normalizeVtuProviderConfig, purchaseWithVtuProvider, selectVtuProvider, type VtuServiceType } from '@/lib/vtu-providers';
 
 type SystemSettingRow = { key: string; value: unknown };
 
@@ -147,7 +147,7 @@ export async function POST(req: Request) {
         let discount = 0;
 
         if (serviceType === 'DATA' && planName) {
-            markupToApply = calculateDataProfit(planName, generalConfig);
+            markupToApply = calculateDataProfit(planName, generalConfig, network);
         } else if (serviceType === 'AIRTIME') {
             // Apply Discount for Airtime
             const purchaseAmount = Number(amount);
@@ -269,24 +269,35 @@ export async function POST(req: Request) {
             return jsonError(`Insufficient ${selectedPaymentSource} balance. Required: ₦${totalCharge}`, 400);
         }
 
-        // 2. Call Inlomax API (Send the actual cost to provider, not the charged amount)
-        let apiResponse;
-        if (serviceType === 'AIRTIME') {
-            apiResponse = await inlomax.purchaseAirtime(mobileNumber, amount, serviceID);
-        } else if (serviceType === 'DATA') {
-            apiResponse = await inlomax.purchaseData(mobileNumber, serviceID);
-        } else if (serviceType === 'CABLE') {
-            // "mobileNumber" here will act as "iucNum" for Cable
-            apiResponse = await inlomax.purchaseCable(mobileNumber, serviceID);
-        } else if (serviceType === 'ELECTRICITY') {
-            // "mobileNumber" is meterNum
-            const mType = meterType || 1; // Default to 1 (Prepaid) if missing
-            apiResponse = await inlomax.payElectricity(mobileNumber, serviceID, mType, Number(amount));
-        } else if (serviceType === 'EDUCATION') {
-            const qty = Number(quantity || 1);
-            apiResponse = await inlomax.purchaseEducation(serviceID, qty);
-        } else {
+        const { data: providerSetting } = await supabaseAdmin
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'vtu_provider_config')
+            .maybeSingle();
+        const providerConfig = normalizeVtuProviderConfig(providerSetting?.value);
+        const provider = selectVtuProvider(providerConfig, serviceType as VtuServiceType, network);
+        console.log('[vtu] provider selection', {
+            serviceType,
+            network,
+            configured: providerSetting?.value || null,
+            selected: provider,
+        });
+        if (!provider) {
             return jsonError('Invalid service type', 400);
+        }
+        const apiResponse = await purchaseWithVtuProvider(provider, {
+            serviceType: serviceType as VtuServiceType,
+            network,
+            serviceID,
+            providerServiceID: body.providerServiceID,
+            mobileNumber,
+            amount: Number(amount),
+            meterType: meterType || 1,
+            quantity: Number(quantity || 1),
+        });
+
+        if (apiResponse.status === 'processing') {
+            return NextResponse.json({ ok: true, status: 'processing', message: apiResponse.message || 'Purchase is processing. Please check the transaction status before retrying.' }, { status: 202 });
         }
 
         if (apiResponse.status !== 'success') {
@@ -310,7 +321,8 @@ export async function POST(req: Request) {
                 p_meta: {
                     service_type: serviceType,
                     service_id: serviceID,
-                    inlomax_id: apiResponse.data?.id || null,
+                    provider,
+                    inlomax_id: provider === 'inlomax' ? apiResponse.data?.id || null : null,
                     provider_ref: apiResponse.data?.reference || null,
                     payment_source: 'reward',
                 }
@@ -351,6 +363,7 @@ export async function POST(req: Request) {
                 service_type: serviceType, // 'AIRTIME', 'DATA', 'EDUCATION', etc.
                 mobile: mobileNumber,
                 network: network,
+                provider,
                 payment_source: selectedPaymentSource,
                 inlomax_id: apiResponse.data?.id,
                 provider_ref: apiResponse.data?.reference,

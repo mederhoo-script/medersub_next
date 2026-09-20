@@ -11,8 +11,16 @@ create table profiles (
   telegram_id text,
   telegram_username text,
   telegram_linked_at timestamp with time zone,
+  api_key_hash text,
+  api_key_encrypted text,
+  api_key_prefix text,
+  is_blocked boolean default false,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+create unique index profiles_api_key_hash_unique
+  on profiles (api_key_hash)
+  where api_key_hash is not null;
 
 -- Set up Row Level Security (RLS)
 alter table profiles enable row level security;

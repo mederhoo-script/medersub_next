@@ -13,7 +13,7 @@
 
 ### 🎯 VTU Services
 - **📱 Airtime Purchase** – Buy airtime for all major networks instantly
-- **📊 Data Bundles** – Affordable data plans for all networks (MTN, Glo, Airtel, 9mobile)
+- **📊 Data Bundles** – Affordable data plans for all networks (MTN, Glo, Airtel, T2mobile)
 - **📺 Cable TV Subscriptions** – Renew DSTV, GOtv, Startimes subscriptions
 - **💡 Electricity Bills** – Pay prepaid and postpaid electricity bills
 - **🎓 Education Pins** – Purchase WAEC, NECO, JAMB, and other exam pins
