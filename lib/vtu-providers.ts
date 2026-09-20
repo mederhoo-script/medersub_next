@@ -159,7 +159,7 @@ export async function getConfiguredServices() {
             const provider = selectVtuProvider(providerConfig, 'DATA', network);
             return provider === 'smeapi'
                 ? smeApiPlans.filter((plan: { network?: string }) => normalizeNetworkName(plan.network) === network)
-                : inlomaxPlans.filter((plan: { network?: string }) => normalizeNetworkName(plan.network) === network).map((plan) => ({ ...plan, provider: 'inlomax' }));
+                : inlomaxPlans.filter((plan: { network?: string }) => normalizeNetworkName(plan.network) === network).map((plan: { network?: string }) => ({ ...plan, provider: 'inlomax' }));
         });
         data.data.providerConfig = providerConfig;
     }
