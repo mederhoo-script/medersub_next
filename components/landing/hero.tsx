@@ -12,6 +12,7 @@ const backgroundImages = [
 
 export default function Hero() {
     const [currentImage, setCurrentImage] = useState(0);
+    const apkDownloadUrl = 'https://medersu.vercel.app/download/medersub.apk';
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -83,19 +84,21 @@ export default function Hero() {
                         </div>
 
                         <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                            <div className="relative group">
-                                <button disabled className="px-6 py-3 bg-white/5 text-slate-400 rounded-lg font-bold text-xs uppercase cursor-not-allowed flex items-center gap-2 border border-white/10">
-                                    <Zap className="h-4 w-4" />
-                                    Android App
-                                </button>
-                                <span className="absolute -top-3 -right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">COMING SOON</span>
-                            </div>
-                            <div className="relative group">
+                            <a
+                                href={apkDownloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="relative group inline-flex items-center justify-center px-6 py-3 bg-green-600 text-white rounded-lg font-bold text-xs uppercase transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-green-600/20 border border-green-500/50"
+                            >
+                                <Zap className="h-4 w-4 mr-2" />
+                                Download APK
+                            </a>
+                            <div className="relative group opacity-70">
                                 <button disabled className="px-6 py-3 bg-white/5 text-slate-400 rounded-lg font-bold text-xs uppercase cursor-not-allowed flex items-center gap-2 border border-white/10">
                                     <CreditCard className="h-4 w-4" />
                                     iOS App
                                 </button>
-                                <span className="absolute -top-3 -right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">COMING SOON</span>
+                               
                             </div>
                         </div>
                     </motion.div>

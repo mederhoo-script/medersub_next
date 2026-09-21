@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { Zap, Smartphone, CreditCard } from 'lucide-react';
 
 export default function Footer() {
+    const apkDownloadUrl = 'https://medersu.vercel.app/download/medersub.apk';
+
     return (
         <footer className="bg-black text-white pt-24 pb-12 border-t border-white/5">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -50,14 +52,18 @@ export default function Footer() {
                         <h4 className="text-white font-bold uppercase tracking-widest text-sm mb-8">Mobile App</h4>
                         <p className="text-slate-400 font-medium mb-6">Experience faster payments on our mobile app.</p>
                         <div className="space-y-4">
-                            <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4 hover:bg-white/10 transition-colors cursor-not-allowed group relative">
+                            <a
+                                href={apkDownloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4 hover:bg-white/10 transition-colors group relative"
+                            >
                                 <Zap className="h-6 w-6 text-green-500" />
                                 <div>
                                     <div className="text-[10px] font-bold uppercase text-slate-500">Download for</div>
                                     <div className="text-sm font-bold">Android</div>
                                 </div>
-                                <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full">SOON</span>
-                            </div>
+                            </a>
                             <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4 hover:bg-white/10 transition-colors cursor-not-allowed group relative">
                                 <CreditCard className="h-6 w-6 text-green-500" />
                                 <div>

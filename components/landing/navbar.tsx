@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const apkDownloadUrl = 'https://medersu.vercel.app/download/medersub.apk';
 
     useEffect(() => {
         const handleScroll = () => {
@@ -35,6 +36,7 @@ export default function Navbar() {
                         <div className="hidden md:flex items-center space-x-8">
                             <Link href="/login" className="text-white hover:text-green-100 transition-colors text-sm font-bold uppercase">Login</Link>
                             <Link href="/register" className="text-white hover:text-green-100 transition-colors text-sm font-bold uppercase">Register</Link>
+                            <a href={apkDownloadUrl} target="_blank" rel="noopener noreferrer" className="text-white hover:text-green-100 transition-colors text-sm font-bold uppercase">Download APK</a>
                             <Link href="#" className="text-white hover:text-green-100 transition-colors text-sm font-bold uppercase">API</Link>
                         </div>
 
@@ -58,6 +60,7 @@ export default function Navbar() {
                         <div className="flex flex-col space-y-4">
                             <Link href="/login" onClick={() => setIsOpen(false)} className="px-4 py-3 rounded-xl text-lg font-medium text-white hover:bg-white/5 transition-colors">Login</Link>
                             <Link href="/register" onClick={() => setIsOpen(false)} className="px-4 py-3 rounded-xl text-lg font-medium text-white hover:bg-white/5 transition-colors">Register</Link>
+                            <a href={apkDownloadUrl} target="_blank" rel="noopener noreferrer" onClick={() => setIsOpen(false)} className="px-4 py-3 rounded-xl text-lg font-medium text-white hover:bg-white/5 transition-colors">Download APK</a>
                             <Link href="#" onClick={() => setIsOpen(false)} className="px-4 py-3 rounded-xl text-lg font-medium text-white hover:bg-white/5 transition-colors">API</Link>
                         </div>
                     </motion.div>
