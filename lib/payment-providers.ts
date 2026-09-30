@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
-export type PaymentProvider = 'monnify' | 'korapay' | 'none';
+export type PaymentProvider = 'monnify' | 'korapay' | 'squad' | 'none';
 
 export function normalizePaymentProvider(value?: string | null): PaymentProvider {
   let normalizedValue = value || 'monnify';
@@ -13,6 +13,7 @@ export function normalizePaymentProvider(value?: string | null): PaymentProvider
 
   const lower = normalizedValue.trim().toLowerCase().replace(/^['"]|['"]$/g, '');
   if (lower === 'korapay') return 'korapay';
+  if (lower === 'squad') return 'squad';
   if (lower === 'none' || lower === 'manual') return 'none';
   return 'monnify';
 }

@@ -5,7 +5,7 @@ import { Loader2, Save } from 'lucide-react';
 
 export default function SettingsPage() {
     const [config, setConfig] = useState<any>({ markup: 0, maintenance: false });
-    const [activeProvider, setActiveProvider] = useState<'monnify' | 'korapay' | 'none'>('monnify');
+    const [activeProvider, setActiveProvider] = useState<'monnify' | 'korapay' | 'squad' | 'none'>('monnify');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [profitData, setProfitData] = useState<any | null>(null);
@@ -41,7 +41,7 @@ export default function SettingsPage() {
                             const parsed = JSON.parse(savedProvider);
                             if (typeof parsed === 'string') savedProvider = parsed.toLowerCase();
                         } catch { /* Stored value may already be plain text. */ }
-                        setActiveProvider(savedProvider === 'korapay' ? 'korapay' : savedProvider === 'none' || savedProvider === 'manual' ? 'none' : 'monnify');
+                        setActiveProvider(savedProvider === 'korapay' ? 'korapay' : savedProvider === 'squad' ? 'squad' : savedProvider === 'none' || savedProvider === 'manual' ? 'none' : 'monnify');
                     }
                     if (data.vtu_provider_config) setVtuConfig({
                         globalProvider: data.vtu_provider_config.globalProvider === 'smeapi' ? 'smeapi' : 'inlomax',
@@ -395,11 +395,12 @@ export default function SettingsPage() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">Active Wallet Funding Provider</label>
                         <select
                             value={activeProvider}
-                            onChange={(e) => setActiveProvider(e.target.value as 'monnify' | 'korapay' | 'none')}
+                            onChange={(e) => setActiveProvider(e.target.value as 'monnify' | 'korapay' | 'squad' | 'none')}
                             className="w-full border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
                         >
                             <option value="monnify">Monnify Virtual Account</option>
                             <option value="korapay">KoraPay Virtual Account</option>
+                            <option value="squad">Squad Virtual Account</option>
                             <option value="none">Manual funding only</option>
                         </select>
                     </div>
