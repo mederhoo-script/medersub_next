@@ -16,7 +16,7 @@ export default function FundWalletPage() {
     const router = useRouter();
     const [amount, setAmount] = useState('');
     const [loading, setLoading] = useState(false);
-    const [provider, setProvider] = useState<'monnify' | 'korapay' | 'none' | null>(null);
+    const [provider, setProvider] = useState<'monnify' | 'korapay' | 'squad' | 'none' | null>(null);
     const [providerLoading, setProviderLoading] = useState(true);
     const [virtualAccount, setVirtualAccount] = useState<any>(null);
     const [accountLoading, setAccountLoading] = useState(false);
@@ -35,7 +35,7 @@ export default function FundWalletPage() {
                 const res = await fetch('/api/payments/provider', { cache: 'no-store' });
                 if (res.ok) {
                     const settings = await res.json();
-                    setProvider(settings.payment_provider === 'korapay' ? 'korapay' : settings.payment_provider === 'none' ? 'none' : 'monnify');
+                    setProvider(settings.payment_provider === 'korapay' ? 'korapay' : settings.payment_provider === 'squad' ? 'squad' : settings.payment_provider === 'none' ? 'none' : 'monnify');
                 } else {
                     setProvider('monnify');
                 }
@@ -51,19 +51,19 @@ export default function FundWalletPage() {
     }, []);
 
     useEffect(() => {
-        if (provider !== 'korapay') return;
+        if (provider !== 'korapay' && provider !== 'squad') return;
 
         const loadVirtualAccount = async () => {
             setAccountLoading(true);
             setKoraError('');
             try {
-                const res = await fetch('/api/payments/korapay/account', { cache: 'no-store' });
+                const res = await fetch(`/api/payments/${provider}/account`, { cache: 'no-store' });
                 const data = await res.json();
                 if (res.ok) {
                     setVirtualAccount(data.virtualAccount || null);
                     setHasBvn(Boolean(data.hasBvn));
                     if (!data.virtualAccount) {
-                        const accountRes = await fetch('/api/payments/korapay/account', { method: 'POST', cache: 'no-store' });
+                        const accountRes = await fetch(`/api/payments/${provider}/account`, { method: 'POST', cache: 'no-store' });
                         const accountData = await accountRes.json();
 
                         if (!accountRes.ok) {
@@ -177,7 +177,7 @@ export default function FundWalletPage() {
         setAccountLoading(true);
         setKoraError('');
         try {
-            const accountRes = await fetch('/api/payments/korapay/account', { method: 'POST' });
+            const accountRes = await fetch(`/api/payments/${provider}/account`, { method: 'POST' });
             const accountData = await accountRes.json();
 
             if (!accountRes.ok) {
@@ -314,8 +314,8 @@ export default function FundWalletPage() {
     };
 
     const koraBankDetails = virtualAccount ? {
-        bankName: virtualAccount.bank_name || 'KoraPay',
-        accountName: virtualAccount.account_name || 'KoraPay Virtual Account',
+        bankName: virtualAccount.bank_name || (provider === 'squad' ? 'Squad' : 'KoraPay'),
+        accountName: virtualAccount.account_name || (provider === 'squad' ? 'Squad Virtual Account' : 'KoraPay Virtual Account'),
         accountNumber: virtualAccount.account_number || ''
     } : null;
 
@@ -363,9 +363,9 @@ export default function FundWalletPage() {
             </div>
 
             {/* Online Payment Card */}
-            {provider === 'korapay' ? (
+            {(provider === 'korapay' || provider === 'squad') ? (
                 <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                    <h2 className="text-lg font-bold text-gray-900 mb-4">One-time funding</h2>
+                    {provider === 'korapay' && <><h2 className="text-lg font-bold text-gray-900 mb-4">One-time funding</h2>
                     <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                         A 1.6% payment fee applies to one-time online funding and is deducted before the remaining amount is added to your wallet. For ₦ 0.00 fees, use the manual transfer option below.
                     </div>
@@ -375,7 +375,7 @@ export default function FundWalletPage() {
                             {checkoutLoading ? 'Opening checkout...' : 'Fund once with KoraPay'}
                         </button>
                     </div>
-                    <h2 className="text-lg font-bold text-gray-900 mb-4">Virtual Account</h2>
+                    </>}<h2 className="text-lg font-bold text-gray-900 mb-4">Virtual Account</h2>
                     {!hasBvn && (
                         <div className='mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'>
                             <p className='font-semibold'>Your daily transfer limit is ₦5,000.</p>
@@ -396,7 +396,7 @@ export default function FundWalletPage() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <div className="text-sm text-red-600">No KoraPay account is available yet.</div>
+                            <div className="text-sm text-red-600">No virtual account is available yet.</div>
                             {koraError ? (
                                 <div className="text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg p-3">{koraError}</div>
                             ) : null}

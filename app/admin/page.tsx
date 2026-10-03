@@ -6,6 +6,15 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
+function parseProviderBalance(value: unknown) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (typeof value === 'string') {
+        const parsed = Number(value.replace(/,/g, ''));
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+}
+
 export default async function AdminDashboardPage() {
     // 1. Fetch Data in Parallel
     const [inlomaxData, smeApiData, userStats, walletStats, recentTx] = await Promise.all([
@@ -18,7 +27,9 @@ export default async function AdminDashboardPage() {
 
     const providerBalance = inlomaxData?.data?.funds || 0;
     const smeApiPayload = smeApiData?.data && typeof smeApiData.data === 'object' ? smeApiData.data : smeApiData;
-    const smeApiBalance = Number((smeApiPayload?.balance ?? smeApiPayload?.wallet_balance ?? smeApiPayload?.funds ?? 0).replace(/,/g, ''));
+    const smeApiBalance = parseProviderBalance(
+        smeApiPayload?.balance ?? smeApiPayload?.wallet_balance ?? smeApiPayload?.funds
+    );
     const smeApiAvailable = smeApiData?.status === 'success';
     const userCount = userStats.count || 0;
     const totalUserWallet = walletStats.data?.reduce((acc, curr) => acc + (Number(curr.balance) || 0), 0) || 0;
