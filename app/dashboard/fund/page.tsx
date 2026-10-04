@@ -19,11 +19,18 @@ export default function FundWalletPage() {
     const [provider, setProvider] = useState<'monnify' | 'korapay' | 'squad' | 'none' | null>(null);
     const [providerLoading, setProviderLoading] = useState(true);
     const [virtualAccount, setVirtualAccount] = useState<any>(null);
+    const [squadAccounts, setSquadAccounts] = useState<any[]>([]);
+    const [squadDepositFee, setSquadDepositFee] = useState(0);
+    const [accountCopyStatus, setAccountCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
     const [accountLoading, setAccountLoading] = useState(false);
     const [koraError, setKoraError] = useState<string>('');
     const [hasBvn, setHasBvn] = useState(true);
+    const [squadCustomerDetails, setSquadCustomerDetails] = useState({ fullName: '', bvn: '', dateOfBirth: '', gender: '', mobileNumber: '', address: '' });
+    const [squadConfiguredDefaults, setSquadConfiguredDefaults] = useState({ defaultAccountReady: false, fullName: false, bvn: false, phone: false, dateOfBirth: false, gender: false, address: false });
+    const [showSquadAccountChoice, setShowSquadAccountChoice] = useState(false);
+    const [showSquadDetailsForm, setShowSquadDetailsForm] = useState(false);
     const [checkoutLoading, setCheckoutLoading] = useState(false);
-    const [fundingResult, setFundingResult] = useState<{ type: 'success' | 'error'; title: string; message: string; grossAmount?: number; fee?: number; creditedAmount?: number } | null>(null);
+    const [fundingResult, setFundingResult] = useState<{ type: 'success' | 'error' | 'pending'; title: string; message: string; grossAmount?: number; fee?: number; creditedAmount?: number } | null>(null);
 
     // Config - Should be in ENV used by component or public constant
     const MONNIFY_API_KEY = process.env.NEXT_PUBLIC_MONNIFY_API_KEY || 'MK_TEST_PLACEHOLDER';
@@ -62,7 +69,29 @@ export default function FundWalletPage() {
                 if (res.ok) {
                     setVirtualAccount(data.virtualAccount || null);
                     setHasBvn(Boolean(data.hasBvn));
-                    if (!data.virtualAccount) {
+                    if (provider === 'squad') {
+                        const accounts = data.virtualAccounts || (data.virtualAccount ? [data.virtualAccount] : []);
+                        setSquadAccounts(accounts);
+                        setSquadDepositFee(Number(data.squadDepositFee) || 0);
+                        setSquadCustomerDetails((current) => ({ ...current, ...(data.customerDetails || {}) }));
+                        setSquadConfiguredDefaults(data.configuredDefaults || { defaultAccountReady: false, fullName: false, bvn: false, phone: false, dateOfBirth: false, gender: false, address: false });
+                        if (accounts.length === 0 && data.configuredDefaults?.defaultAccountReady) {
+                            const accountRes = await fetch('/api/payments/squad/account', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ accountMode: 'default' }),
+                            });
+                            const accountData = await accountRes.json();
+                            if (accountRes.ok) {
+                                setVirtualAccount(accountData.virtualAccount || null);
+                                setSquadAccounts(accountData.virtualAccount ? [accountData.virtualAccount] : []);
+                            } else {
+                                setKoraError(accountData?.error || 'Failed to create the default Squad account.');
+                                setShowSquadAccountChoice(true);
+                            }
+                        }
+                    }
+                    if (!data.virtualAccount && provider === 'korapay') {
                         const accountRes = await fetch(`/api/payments/${provider}/account`, { method: 'POST', cache: 'no-store' });
                         const accountData = await accountRes.json();
 
@@ -78,6 +107,9 @@ export default function FundWalletPage() {
                         } else {
                             setVirtualAccount(accountData.virtualAccount || null);
                         }
+                    } else if (!data.virtualAccount && provider === 'squad') {
+                        setKoraError('');
+                        setShowSquadAccountChoice(true);
                     }
                 } else {
                     if (res.status === 403) {
@@ -103,34 +135,86 @@ export default function FundWalletPage() {
     }, [provider]);
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const reference = params.get('reference');
-        if (params.get('payment') !== 'korapay' || !reference) return;
+        if (provider !== 'korapay') return;
+        let cancelled = false;
 
-        const verifyCheckout = async () => {
-            setCheckoutLoading(true);
+        const pollPendingCheckouts = async () => {
             try {
-                const response = await fetch('/api/payments/korapay/checkout/verify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ reference }),
-                });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error || 'Payment verification failed.');
-                if (data.status === 'credited' || data.status === 'duplicate' || data.creditedAmount) {
-                    setFundingResult({ type: 'success', title: 'Wallet funded successfully', message: 'Your payment was verified securely.', grossAmount: Number(data.grossAmount), fee: Number(data.fee), creditedAmount: Number(data.creditedAmount) });
-                } else {
-                    setFundingResult({ type: 'error', title: 'Payment not completed', message: `Payment status: ${data.status || 'pending'}.` });
+                const pendingResponse = await fetch('/api/payments/korapay/checkout/verify', { cache: 'no-store' });
+                const pendingData = await pendingResponse.json();
+                if (!pendingResponse.ok) throw new Error(pendingData.error || 'Unable to check pending payments.');
+
+                const expiryFallback = Date.now() + 20 * 60 * 1000;
+                const attempts = new Map<string, number>();
+                for (const item of pendingData.pending || []) {
+                    if (item.reference) attempts.set(String(item.reference), Date.parse(item.expiresAt) || expiryFallback);
+                }
+                const params = new URLSearchParams(window.location.search);
+                const returnedReference = params.get('payment') === 'korapay' ? params.get('reference') : null;
+                if (returnedReference && !attempts.has(returnedReference)) attempts.set(returnedReference, expiryFallback);
+                if (attempts.size === 0) return;
+
+                setCheckoutLoading(true);
+                setFundingResult({ type: 'pending', title: 'Checking payment status', message: 'KoraPay is confirming your payment. We will keep checking for up to 20 minutes.' });
+
+                const unresolved = new Set(attempts.keys());
+                while (!cancelled && unresolved.size > 0) {
+                    const now = Date.now();
+                    const references = [...unresolved];
+                    const results = await Promise.all(references.map(async (reference) => {
+                        const expiresAt = attempts.get(reference) || now;
+                        if (now >= expiresAt) return { reference, expired: true as const };
+                        try {
+                            const response = await fetch('/api/payments/korapay/checkout/verify', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ reference }),
+                            });
+                            const data = await response.json();
+                            if (response.status === 404 || response.status === 403) return { reference, error: data.error || 'Payment reference could not be verified.' };
+                            if (!response.ok) return { reference, retry: true as const };
+                            if (data.status === 'credited' || data.status === 'duplicate' || data.creditedAmount) return { reference, success: data };
+                            if (['failed', 'cancelled'].includes(String(data.status).toLowerCase())) return { reference, failed: data.status };
+                            if (String(data.status).toLowerCase() === 'expired') return { reference, expired: true as const };
+                            return { reference, retry: true as const };
+                        } catch {
+                            return { reference, retry: true as const };
+                        }
+                    }));
+
+                    let keepChecking = false;
+                    for (const result of results) {
+                        if ('success' in result) {
+                            unresolved.delete(result.reference);
+                            setFundingResult({ type: 'success', title: 'Wallet funded successfully', message: 'Your payment was verified securely.', grossAmount: Number(result.success.grossAmount), fee: Number(result.success.fee), creditedAmount: Number(result.success.creditedAmount) });
+                        } else if ('failed' in result) {
+                            unresolved.delete(result.reference);
+                            setFundingResult({ type: 'error', title: 'Payment not completed', message: `KoraPay payment status: ${result.failed}.` });
+                        } else if ('error' in result) {
+                            unresolved.delete(result.reference);
+                            setFundingResult({ type: 'error', title: 'Payment could not be verified', message: result.error });
+                        } else if ('expired' in result) {
+                            unresolved.delete(result.reference);
+                            setFundingResult({ type: 'pending', title: 'Payment still processing', message: 'KoraPay has not confirmed this payment within 20 minutes. If your account was debited, its webhook can still update your wallet; contact support with your payment reference if it does not.' });
+                        } else {
+                            keepChecking = true;
+                        }
+                    }
+
+                    if (keepChecking && unresolved.size > 0 && !cancelled) {
+                        await new Promise((resolve) => window.setTimeout(resolve, 15000));
+                    }
                 }
             } catch (error) {
-                setFundingResult({ type: 'error', title: 'Funding verification failed', message: error instanceof Error ? error.message : 'Payment verification failed.' });
+                if (!cancelled) setFundingResult({ type: 'error', title: 'Payment status unavailable', message: error instanceof Error ? error.message : 'Unable to check payment status.' });
             } finally {
-                setCheckoutLoading(false);
+                if (!cancelled) setCheckoutLoading(false);
             }
         };
 
-        void verifyCheckout();
-    }, [router]);
+        void pollPendingCheckouts();
+        return () => { cancelled = true; };
+    }, [provider]);
 
     const startKoraPayCheckout = async () => {
         const checkoutAmount = Math.round(Number(amount));
@@ -168,16 +252,25 @@ export default function FundWalletPage() {
     };
     const MANUAL_PAYMENT_WHATSAPP_NUMBER = '2348034295030';
 
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text);
-        alert('Account number copied!');
+    const copyToClipboard = async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setAccountCopyStatus('copied');
+        } catch {
+            setAccountCopyStatus('error');
+        }
+        window.setTimeout(() => setAccountCopyStatus('idle'), 2000);
     };
 
-    const retryCreateKoraAccount = async () => {
+    const retryCreateKoraAccount = async (accountMode: 'personal' | 'default' = 'personal') => {
         setAccountLoading(true);
         setKoraError('');
         try {
-            const accountRes = await fetch(`/api/payments/${provider}/account`, { method: 'POST' });
+            const accountRes = await fetch(`/api/payments/${provider}/account`, {
+                method: 'POST',
+                headers: provider === 'squad' ? { 'Content-Type': 'application/json' } : undefined,
+                body: provider === 'squad' ? JSON.stringify({ accountMode, ...(accountMode === 'personal' ? squadCustomerDetails : {}) }) : undefined,
+            });
             const accountData = await accountRes.json();
 
             if (!accountRes.ok) {
@@ -188,6 +281,14 @@ export default function FundWalletPage() {
             }
 
             setVirtualAccount(accountData.virtualAccount || null);
+            if (provider === 'squad' && accountData.virtualAccount) {
+                setSquadAccounts((current) => [
+                    ...current.filter((account) => account.account_mode !== accountData.virtualAccount.account_mode),
+                    accountData.virtualAccount,
+                ]);
+            }
+            setShowSquadAccountChoice(false);
+            setShowSquadDetailsForm(false);
         } catch (error) {
             console.error('[fund-page] Manual create KoraPay account failed', error);
             setKoraError('Unable to create KoraPay account right now.');
@@ -328,8 +429,8 @@ export default function FundWalletPage() {
             {fundingResult && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 px-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="funding-result-title">
                     <div className="w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl">
-                        <div className={`${fundingResult.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'} px-6 py-7 text-center text-white`}>
-                            {fundingResult.type === 'success' ? <CheckCircle2 className="mx-auto h-14 w-14" /> : <XCircle className="mx-auto h-14 w-14" />}
+                        <div className={`${fundingResult.type === 'success' ? 'bg-emerald-600' : fundingResult.type === 'pending' ? 'bg-sky-700' : 'bg-rose-600'} px-6 py-7 text-center text-white`}>
+                            {fundingResult.type === 'success' ? <CheckCircle2 className="mx-auto h-14 w-14" /> : fundingResult.type === 'pending' ? <Loader2 className="mx-auto h-14 w-14 animate-spin" /> : <XCircle className="mx-auto h-14 w-14" />}
                             <h2 id="funding-result-title" className="mt-3 text-xl font-bold">{fundingResult.title}</h2>
                             <p className="mt-1 text-sm text-white/85">{fundingResult.message}</p>
                         </div>
@@ -344,6 +445,67 @@ export default function FundWalletPage() {
                             <button type="button" onClick={closeFundingResult} className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800">Close</button>
                         </div>
                     </div>
+                </div>
+            )}
+            {showSquadAccountChoice && provider === 'squad' && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/60 px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="squad-account-choice-title">
+                    <div className="my-auto w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="border-b border-slate-200 px-6 py-5">
+                            <h2 id="squad-account-choice-title" className="text-lg font-bold text-slate-900">Choose your virtual account</h2>
+                            <p className="mt-1 text-sm text-slate-600">Each option creates an account with its own account number.</p>
+                        </div>
+                        <div className="space-y-4 px-6 py-5">
+                            {koraError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{koraError}</p>}
+                            <button type="button" onClick={() => { setShowSquadAccountChoice(false); setShowSquadDetailsForm(true); }} disabled={accountLoading} className="w-full rounded-xl border border-slate-200 p-4 text-left transition-colors hover:border-sky-500 hover:bg-sky-50 disabled:opacity-60">
+                                <span className="block font-semibold text-slate-900">Personal account</span>
+                                <span className="mt-1 block text-sm leading-5 text-slate-600">Created with your own verified identity. No Medersub daily cap; Squad, bank, and regulatory limits still apply.</span>
+                            </button>
+                            <button type="button" onClick={() => void retryCreateKoraAccount('default')} disabled={!squadConfiguredDefaults.defaultAccountReady || accountLoading} className="w-full rounded-xl border border-slate-200 p-4 text-left transition-colors hover:border-sky-500 hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-60">
+                                <span className="block font-semibold text-slate-900">Default account · ₦10,000/day</span>
+                                <span className="mt-1 block text-sm leading-5 text-slate-600">Created using the configured default customer profile. Deposits above the daily cap are held for review, not immediately credited.</span>
+                                {!squadConfiguredDefaults.defaultAccountReady && <span className="mt-2 block text-xs font-medium text-amber-800">Unavailable until all six SQUAD_DEFAULT_* values are configured on the server.</span>}
+                                {accountLoading && <span className="mt-2 flex items-center gap-2 text-xs font-semibold text-sky-800"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Creating account…</span>}
+                            </button>
+                        </div>
+                        <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-6 py-4">
+                            <button type="button" onClick={() => setShowSquadAccountChoice(false)} disabled={accountLoading} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white disabled:opacity-60">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showSquadDetailsForm && provider === 'squad' && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center overflow-y-auto bg-slate-950/60 px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="squad-details-title">
+                    <form onSubmit={(event) => { event.preventDefault(); void retryCreateKoraAccount(); }} className="my-auto w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+                        <div className="border-b border-slate-200 px-6 py-5">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 id="squad-details-title" className="text-lg font-bold text-slate-900">Create your personal account</h2>
+                                    <p className="mt-1 text-sm text-slate-600">Squad verifies these details against your BVN record.</p>
+                                </div>
+                                <button type="button" onClick={() => setShowSquadDetailsForm(false)} aria-label="Close form" className="rounded-md px-2 py-1 text-sm font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-900">Close</button>
+                            </div>
+                        </div>
+                        <div className="max-h-[65vh] space-y-4 overflow-y-auto px-6 py-5">
+                            {koraError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{koraError}</p>}
+                            <label className="block text-sm font-medium text-slate-700">Full legal name<input autoComplete="name" value={squadCustomerDetails.fullName} onChange={(event) => setSquadCustomerDetails({ ...squadCustomerDetails, fullName: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-100" required /></label>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <label className="block text-sm font-medium text-slate-700">BVN<input inputMode="numeric" autoComplete="off" maxLength={11} value={squadCustomerDetails.bvn} onChange={(event) => setSquadCustomerDetails({ ...squadCustomerDetails, bvn: event.target.value.replace(/\D/g, '').slice(0, 11) })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-100" placeholder="11 digits" required /></label>
+                                <label className="block text-sm font-medium text-slate-700">Phone number<input type="tel" inputMode="numeric" autoComplete="tel" maxLength={11} value={squadCustomerDetails.mobileNumber} onChange={(event) => setSquadCustomerDetails({ ...squadCustomerDetails, mobileNumber: event.target.value.replace(/\D/g, '').slice(0, 11) })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-100" placeholder="08012345678" required /></label>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <label className="block text-sm font-medium text-slate-700">Date of birth<input type="date" value={squadCustomerDetails.dateOfBirth} onChange={(event) => setSquadCustomerDetails({ ...squadCustomerDetails, dateOfBirth: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-100" required /></label>
+                                <label className="block text-sm font-medium text-slate-700">Gender<select value={squadCustomerDetails.gender} onChange={(event) => setSquadCustomerDetails({ ...squadCustomerDetails, gender: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-100" required><option value="">Select gender</option><option value="1">Male</option><option value="2">Female</option></select></label>
+                            </div>
+                            <label className="block text-sm font-medium text-slate-700">Residential address<textarea autoComplete="street-address" value={squadCustomerDetails.address} onChange={(event) => setSquadCustomerDetails({ ...squadCustomerDetails, address: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-slate-900 focus:border-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-100" rows={3} required /></label>
+                        </div>
+                        <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+                            <button type="button" onClick={() => setShowSquadDetailsForm(false)} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white">Cancel</button>
+                            <button type="submit" disabled={accountLoading} className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-60">
+                                {accountLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                                {accountLoading ? 'Creating account...' : 'Create virtual account'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
             {/* Script with onLoad to confirm it loaded */}
@@ -376,7 +538,7 @@ export default function FundWalletPage() {
                         </button>
                     </div>
                     </>}<h2 className="text-lg font-bold text-gray-900 mb-4">Virtual Account</h2>
-                    {!hasBvn && (
+                    {!hasBvn && provider === 'korapay' && (
                         <div className='mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900'>
                             <p className='font-semibold'>Your daily transfer limit is ₦5,000.</p>
                             <p className='mt-1'>Add your BVN to remove this limit.</p>
@@ -389,10 +551,32 @@ export default function FundWalletPage() {
                         <div className="flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading your virtual account...</div>
                     ) : koraBankDetails ? (
                         <div className="space-y-3 text-sm">
+                            {provider === 'squad' && squadAccounts.length > 1 && (
+                                <div className="flex flex-wrap gap-2" aria-label="Choose account">
+                                    {squadAccounts.map((account) => (
+                                        <button key={account.id} type="button" onClick={() => setVirtualAccount(account)} aria-pressed={virtualAccount.id === account.id} className={`rounded-lg border px-3 py-2 text-xs font-semibold ${virtualAccount.id === account.id ? 'border-sky-700 bg-sky-50 text-sky-900' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                                            {account.account_mode === 'default' ? 'Default · ₦10k/day' : 'Personal'}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                             <div><span className="text-gray-500">Bank:</span> <span className="font-semibold">{koraBankDetails.bankName}</span></div>
                             <div><span className="text-gray-500">Account Name:</span> <span className="font-semibold">{koraBankDetails.accountName}</span></div>
-                            <div><span className="text-gray-500">Account Number:</span> <span className="font-semibold text-lg">{koraBankDetails.accountNumber}</span></div>
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0"><span className="text-gray-500">Account Number:</span> <span className="break-all text-lg font-semibold">{koraBankDetails.accountNumber}</span></div>
+                                <button type="button" onClick={() => void copyToClipboard(koraBankDetails.accountNumber)} aria-label="Copy account number" title="Copy account number" className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                    {accountCopyStatus === 'copied' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                                    {accountCopyStatus === 'copied' ? 'Copied' : 'Copy'}
+                                </button>
+                            </div>
+                            {accountCopyStatus === 'error' && <p role="status" className="text-xs text-rose-700">Could not copy automatically. Select and copy the account number.</p>}
+                            {provider === 'squad' && virtualAccount.account_mode === 'default' && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">Default account limit: ₦{Number(virtualAccount.daily_limit || 10000).toLocaleString('en-NG')} credited per day. Deposits above the limit are held for review.</div>}
+                            {provider === 'squad' && virtualAccount.account_mode === 'personal' && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">Personal account. No Medersub daily funding cap; Squad and bank limits still apply.</div>}
+                            {provider === 'squad' && <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-700">{squadDepositFee > 0 ? `A ₦${squadDepositFee.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} fee is deducted from each deposit before wallet credit.` : 'No additional Medersub fee is deducted from Squad deposits.'}</div>}
                             <div className="text-xs text-amber-700 bg-amber-50 p-3 rounded-lg">Fund this account from your bank app; and our system will credit your wallet once verified.</div>
+                            {provider === 'squad' && virtualAccount.account_mode === 'default' && !squadAccounts.some((account) => account.account_mode === 'personal') && (
+                                <button type="button" onClick={() => { setKoraError(''); setShowSquadDetailsForm(true); }} className="w-full rounded-lg border border-sky-700 px-4 py-3 text-sm font-semibold text-sky-800 hover:bg-sky-50">Create personal account</button>
+                            )}
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -400,13 +584,16 @@ export default function FundWalletPage() {
                             {koraError ? (
                                 <div className="text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg p-3">{koraError}</div>
                             ) : null}
-                            <button
-                                onClick={retryCreateKoraAccount}
-                                disabled={accountLoading}
-                                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60"
-                            >
-                                Retry Account Creation
-                            </button>
+                            {provider === 'squad' ? (
+                                <div className="space-y-3">
+                                    {!hasBvn && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">A personal account requires your own valid BVN. You can choose the configured default account if it is available.</div>}
+                                    <button type="button" onClick={() => setShowSquadAccountChoice(true)} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">Choose account type</button>
+                                </div>
+                            ) : (
+                                <button onClick={retryCreateKoraAccount} disabled={accountLoading} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60">
+                                    Retry Account Creation
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>

@@ -41,23 +41,30 @@ export default function DashboardPage() {
         const fetchProfile = async () => {
             try {
                 const { data: { user }, error: userError } = await supabase.auth.getUser();
-                console.log('[Dashboard] User:', user?.email, 'Error:', userError);
 
                 if (user) {
-                    const { data, error: profileError } = await supabase
-                        .from('profiles')
-                        .select('*, wallets(balance), virtual_accounts(account_number,bank_name,account_name,status)')
-                        .eq('id', user.id)
-                        .single();
-
-                    console.log('[Dashboard] Profile:', data, 'Error:', profileError);
+                    const [{ data, error: profileError }, providerResponse] = await Promise.all([
+                        supabase
+                            .from('profiles')
+                            .select('*, wallets(balance), virtual_accounts(account_number,bank_name,account_name,status,provider,account_mode)')
+                            .eq('id', user.id)
+                            .single(),
+                        fetch('/api/payments/provider', { cache: 'no-store' }),
+                    ]);
 
                     if (data) {
                         const mainBalance = Number(data.wallets?.[0]?.balance || 0);
                         const rewardBalance = Number(data.reward_balance_ngn || 0);
-                        const virtualAccount = data.virtual_accounts?.find((account: any) => account.status === 'active') || data.virtual_accounts?.[0] || null;
+                        const providerData = providerResponse.ok ? await providerResponse.json() : null;
+                        const activeProvider = providerData?.payment_provider;
+                        const providerAccounts = (data.virtual_accounts || []).filter((account: any) => account.provider === activeProvider);
+                        const activeAccounts = providerAccounts.filter((account: any) => account.status === 'active');
+                        const virtualAccount = activeProvider === 'squad'
+                            ? activeAccounts.find((account: any) => account.account_mode === 'default') || activeAccounts[0] || null
+                            : activeAccounts[0] || providerAccounts[0] || null;
                         setProfile({ ...data, mainBalance, rewardBalance, virtualAccount });
                     }
+                    if (profileError) console.error('[Dashboard] Unable to load profile:', profileError.message);
                 }
             } finally {
                 setLoadingProfile(false);

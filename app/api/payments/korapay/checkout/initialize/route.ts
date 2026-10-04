@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { getActivePaymentProvider } from '@/lib/payment-providers';
 import { korapayFetch } from '@/lib/korapay';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 
 async function getCurrentUser() {
   const cookieStore = await cookies();
@@ -33,6 +34,25 @@ export async function POST(req: Request) {
 
     const reference = `fund-${user.id.replace(/-/g, '').slice(0, 12)}-${Date.now()}`;
     const origin = new URL(req.url).origin;
+    const { error: pendingError } = await supabaseAdmin.from('transactions').insert({
+      user_id: user.id,
+      type: 'deposit',
+      amount,
+      charged_amount: amount,
+      status: 'pending',
+      reference,
+      provider: 'korapay',
+      provider_ref: reference,
+      meta: {
+        provider: 'korapay',
+        provider_ref: reference,
+        source: 'checkout',
+        purpose: 'wallet-funding',
+        principal_amount: amount,
+      },
+    });
+    if (pendingError) throw pendingError;
+
     const response = await korapayFetch<{ status: boolean; message?: string; data?: { checkout_url?: string; reference?: string } }>('/charges/initialize', {
       method: 'POST',
       body: JSON.stringify({
@@ -51,7 +71,7 @@ export async function POST(req: Request) {
 
     const checkoutUrl = response.data?.checkout_url;
     if (!checkoutUrl) return NextResponse.json({ error: 'KoraPay did not return a checkout URL.' }, { status: 502 });
-    return NextResponse.json({ checkoutUrl, reference: response.data?.reference || reference });
+    return NextResponse.json({ checkoutUrl, reference });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to initialize KoraPay checkout.' }, { status: 500 });
   }

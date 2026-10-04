@@ -33,20 +33,23 @@ export default function LoginPage() {
         setLoading(true);
         setError(null);
 
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        });
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) {
+                setError(error.message.toLowerCase().includes('invalid login credentials')
+                    ? 'Incorrect email or password. Please try again.'
+                    : 'Unable to sign in with those details. Please try again.');
+                return;
+            }
 
-        if (error) {
-            console.error('Login Error:', error);
-            setError(error.message);
-            setLoading(false);
-        } else {
             console.log('Login Success! User:', data.user?.email);
             console.log('Session:', data.session ? 'Active' : 'Missing');
             router.refresh();
             router.push('/dashboard');
+        } catch {
+            setError('Unable to sign in right now. Check your connection and try again.');
+        } finally {
+            setLoading(false);
         }
     };
 

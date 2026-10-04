@@ -62,7 +62,8 @@ export default function WalletCard({
 
                     {virtualAccount && (
                     <div className='rounded-xl border border-blue-400/30 bg-blue-500/30 p-3 text-sm sm:w-64 sm:shrink-0'>
-                        <p className='text-xs font-medium text-blue-100'>Your KoraPay account</p>
+                        <p className='text-xs font-medium text-blue-100'>Your Virtual Account</p>
+                        <span className='font-bold tracking-wide'>{virtualAccount.account_name}</span>
                         <p className='mt-1 text-xs text-blue-100'>{virtualAccount.bank_name}</p>
                         <div className='mt-1 flex items-center justify-between gap-3'>
                             <span className='font-bold tracking-wide'>{virtualAccount.account_number}</span>

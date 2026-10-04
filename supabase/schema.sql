@@ -148,12 +148,15 @@ create table if not exists virtual_accounts (
   bank_code text,
   currency text not null default 'NGN',
   status text not null default 'active',
+  account_mode text not null default 'personal' check (account_mode in ('personal', 'default')),
+  daily_limit numeric check (daily_limit is null or daily_limit > 0),
+  check ((account_mode = 'personal' and daily_limit is null) or (account_mode = 'default' and daily_limit is not null and daily_limit > 0)),
   raw_response jsonb,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  unique (user_id, provider)
+  unique (user_id, provider, account_mode)
 );
 
-create unique index if not exists virtual_accounts_user_provider_unique on virtual_accounts (user_id, provider);
+create unique index if not exists virtual_accounts_user_provider_mode_unique on virtual_accounts (user_id, provider, account_mode);
 create index if not exists virtual_accounts_account_reference_idx on virtual_accounts (account_reference);
 
 create or replace function public.get_auth_user_id_by_email(p_email text)

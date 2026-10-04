@@ -21,6 +21,11 @@ type TransactionReceipt = {
         payment_source?: string;
         network?: string;
         mobile?: string;
+        review_reason?: string;
+        principal_amount?: number | string;
+        platform_fee?: number | string;
+        configured_fee?: number | string;
+        credited_amount?: number | string;
         [key: string]: unknown;
     } | null;
 };
@@ -54,7 +59,17 @@ const receiptRows = (tx: TransactionReceipt): ReceiptRow[] => [
     ] as ReceiptRow[]) : []),
     ['Service', isRefundTransaction(tx) ? 'Refund' : (tx.meta?.service_type || tx.service_type || tx.type || 'Transaction').toString().toUpperCase()],
     ['Status', tx.status || 'pending'],
+    ...(tx.meta?.review_reason === 'daily_limit_exceeded' ? ([
+        ['Review note', 'Daily Squad funding limit exceeded. This deposit is pending review and has not been added to your wallet.']
+    ] as ReceiptRow[]) : []),
+    ...(tx.meta?.review_reason === 'deposit_not_greater_than_fee' ? ([
+        ['Review note', 'The configured Squad fee is at least the deposit amount. This deposit is pending review and has not been added to your wallet.']
+    ] as ReceiptRow[]) : []),
     [getReceiptAmountLabel(tx), formatCurrency(getTransactionAmount(tx))],
+    ...(Number(tx.meta?.platform_fee ?? tx.meta?.configured_fee ?? 0) > 0 ? ([
+        ['Squad platform fee', `- ${formatCurrency(tx.meta?.platform_fee ?? tx.meta?.configured_fee)}`],
+        ['Added to wallet', formatCurrency(tx.meta?.credited_amount ?? 0)],
+    ] as ReceiptRow[]) : []),
     ...(tx.meta?.payment_source ? ([['Payment Source', tx.meta.payment_source]] as ReceiptRow[]) : []),
     ...(tx.meta?.network ? ([['Network / Provider', tx.meta.network]] as ReceiptRow[]) : []),
     ...(tx.meta?.mobile ? ([['Customer / Meter / IUC', tx.meta.mobile]] as ReceiptRow[]) : []),
