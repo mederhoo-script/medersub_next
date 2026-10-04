@@ -590,7 +590,7 @@ export default function FundWalletPage() {
                                     <button type="button" onClick={() => setShowSquadAccountChoice(true)} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">Choose account type</button>
                                 </div>
                             ) : (
-                                <button onClick={retryCreateKoraAccount} disabled={accountLoading} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60">
+                                <button onClick={() => void retryCreateKoraAccount()} disabled={accountLoading} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60">
                                     Retry Account Creation
                                 </button>
                             )}
