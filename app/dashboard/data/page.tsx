@@ -68,8 +68,9 @@ const normalizeHotSizeMb = (value?: string) => {
 };
 
 const isSocialBundle = (value?: string) => /social/i.test(String(value ?? ''));
+const isSocialBundlePlan = (item: DataPlan) => isSocialBundle(item.dataType) || isSocialBundle(item.dataPlan);
 const isHotDataPlan = (item: DataPlan) => {
-    if (!item || isSocialBundle(item.dataPlan)) return false;
+    if (!item || isSocialBundlePlan(item)) return false;
     const price = Number(item.amount ?? 0);
     if (price >= 800) return false;
     const sizeMb = normalizeHotSizeMb(item.dataPlan);
@@ -103,7 +104,11 @@ export default function DataPage() {
             return firstIndex - secondIndex;
         });
     const hotPlans = (plans || []).filter(isHotDataPlan).sort((a, b) => Number(a.amount) - Number(b.amount));
-    const categories = ['HOT', ...Array.from(new Set(plans.map((item) => item.dataType?.trim()).filter(Boolean)))].filter(Boolean) as string[];
+    const dataTypeCategories = Array.from(new Set(plans.map((item) => item.dataType?.trim()).filter(Boolean))) as string[];
+    const categories = ['HOT', ...dataTypeCategories];
+    if (plans.some(isSocialBundlePlan) && !dataTypeCategories.some((item) => item.toUpperCase() === 'SOCIAL BUNDLES')) {
+        categories.push('SOCIAL BUNDLES');
+    }
     const [category, setCategory] = useState('HOT');
     const [beneficiaries, setBeneficiaries] = useState<string[]>([]);
     const [beneficiaryOpen, setBeneficiaryOpen] = useState(false);
@@ -222,6 +227,7 @@ export default function DataPage() {
             setPlans(filtered);
             setCategory((current) => {
                 if (current === 'HOT') return 'HOT';
+                if (current?.toUpperCase() === 'SOCIAL BUNDLES' && filtered.some(isSocialBundlePlan)) return current;
                 if (current && filtered.some((item) => item.dataType?.trim() === current)) return current;
                 return filtered.length > 0 ? 'HOT' : '';
             });
@@ -230,6 +236,8 @@ export default function DataPage() {
 
     const visiblePlans = category === 'HOT'
         ? hotPlans
+        : category.toUpperCase() === 'SOCIAL BUNDLES'
+            ? plans.filter(isSocialBundlePlan)
         : category
             ? plans.filter((item) => item.dataType?.trim() === category)
             : plans;
@@ -391,10 +399,15 @@ export default function DataPage() {
                             {visiblePlans.map((item) => {
                                 const amount = Number(item.amount.toString().replace(/,/g, '')) + calculateDataProfit(item.dataPlan, pricing, network);
                                 const selected = plan?.serviceID === item.serviceID;
+                                const isAirtelSme2 = normalizeNetworkKey(item.network) === 'AIRTEL' && item.dataType?.trim().toUpperCase() === 'SME2';
                                 return <button key={item.serviceID} type="button" onClick={() => setPlan(item)} className={`min-h-[135px] rounded-2xl bg-blue-100 p-3 text-left transition-all sm:min-h-[165px] sm:rounded-[21px] ${selected ? 'border-2 border-[#0965df] bg-cyan-300' : 'border-2.5 border-transparent bg-white'}`}>
                                     <span className="block text-sm text-[#202632] sm:text-[17px]">{item.validity || 'Flexible'}</span>
                                     <strong className="mt-5 block text-center text-lg font-medium text-[#171d2a] sm:mt-7 sm:text-[20px]">{item.dataPlan}</strong>
                                     <span className="mt-4 block text-right text-sm font-bold text-[#202632] sm:mt-6 sm:text-[17px]">₦{amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
+                                    {(isAirtelSme2 || (category === 'HOT' && item.dataType?.trim())) && <span className="mt-1 flex min-h-[12px] items-center justify-between gap-1">
+                                        {isAirtelSme2 && <span className="truncate text-[11px] font-medium text-amber-700">Works on eligible SIMs only</span>}
+                                        {category === 'HOT' && item.dataType?.trim() && <span className="shrink-0 text-[10px] font-semibold text-[#0965df]">{displayName(item.dataType.trim())}</span>}
+                                    </span>}
                                 </button>;
                             })}
                         </div>}
