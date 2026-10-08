@@ -6,6 +6,7 @@ import clsx from 'clsx';
 type AdminTransaction = {
     id: string;
     user_id?: string;
+    service_id?: string | null;
     type?: string;
     amount?: number | string | null;
     charged_amount?: number | string | null;
@@ -23,6 +24,12 @@ type AdminTransaction = {
         payment_source?: string;
         [key: string]: unknown;
     } | null;
+};
+
+const formatReceiptValue = (value: unknown): string => {
+    if (value === null || value === undefined || value === '') return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return JSON.stringify(value) ?? String(value);
 };
 
 export default function AdminTransactionsPage() {
@@ -56,6 +63,21 @@ export default function AdminTransactionsPage() {
         tx.meta?.provider_ref?.toLowerCase?.().includes(searchTerm.toLowerCase()) ||
         tx.profiles?.email?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+    const isDataReceipt = (selectedReceipt?.meta?.service_type || selectedReceipt?.service_type || '').toUpperCase() === 'DATA';
+    const receiptPurchaseRows: [string, string][] = selectedReceipt ? ([
+        [isDataReceipt ? 'Data Plan' : 'Purchased Item / Plan', formatReceiptValue(selectedReceipt.meta?.plan_name ?? selectedReceipt.meta?.planName ?? selectedReceipt.meta?.product_name)],
+        ['Service ID', formatReceiptValue(selectedReceipt.service_id ?? selectedReceipt.meta?.service_id)],
+        ['Provider Service ID', formatReceiptValue(selectedReceipt.meta?.provider_service_id)],
+        ...(isDataReceipt ? [
+            ['Data Type', formatReceiptValue(selectedReceipt.meta?.data_type)],
+            ['Validity', formatReceiptValue(selectedReceipt.meta?.validity)],
+        ] : [
+            ['Meter Type', formatReceiptValue(selectedReceipt.meta?.meter_type)],
+            ['Quantity', formatReceiptValue(selectedReceipt.meta?.quantity)],
+            ['Education PINs', formatReceiptValue(selectedReceipt.meta?.pins)],
+        ]),
+        ['Ported Number', selectedReceipt.meta?.ported_number === undefined ? '' : selectedReceipt.meta.ported_number ? 'Yes' : 'No'],
+    ] as [string, string][]).filter(([, value]) => value.length > 0) : [];
 
     return (
         <div className="space-y-6">
@@ -253,9 +275,11 @@ export default function AdminTransactionsPage() {
                                 ['User', selectedReceipt.profiles?.email || selectedReceipt.user_id || 'Unknown'],
                                 ['Service', (selectedReceipt.meta?.service_type || selectedReceipt.service_type || selectedReceipt.type || 'Transaction').toString().toUpperCase()],
                                 ['Customer / Meter / IUC', selectedReceipt.meta?.mobile || 'N/A'],
-                                ['Network / Provider', selectedReceipt.meta?.network || 'N/A'],
+                                ['Network', selectedReceipt.meta?.network || 'N/A'],
+                                ['Provider', formatReceiptValue(selectedReceipt.meta?.provider) || 'N/A'],
+                                ...receiptPurchaseRows,
                                 ['Amount', `₦${Number(selectedReceipt.amount || 0).toLocaleString()}`],
-                                ['Total Charged', `₦${Number(selectedReceipt.charged_amount || selectedReceipt.amount || 0).toLocaleString()}`],
+                                [isDataReceipt ? 'Data Plan Price' : 'Total Charged', `₦${Number(selectedReceipt.charged_amount || selectedReceipt.amount || 0).toLocaleString('en-NG', { minimumFractionDigits: 2 })}`],
                                 ['Payment Source', selectedReceipt.meta?.payment_source || 'wallet'],
                                 ['Status', selectedReceipt.status || 'pending'],
                                 ['Date', new Date(selectedReceipt.created_at).toLocaleString()],

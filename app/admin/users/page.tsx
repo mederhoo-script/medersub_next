@@ -23,6 +23,7 @@ export default function AdminUsersPage() {
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [userSort, setUserSort] = useState<'newest' | 'balance-high-to-low' | 'balance-low-to-high'>('newest');
     const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
     const [saving, setSaving] = useState(false);
     const [userEarnings, setUserEarnings] = useState<any[]>([]);
@@ -197,7 +198,12 @@ export default function AdminUsersPage() {
         u.phone?.toLowerCase().includes(normalizedSearch) ||
         String(u.telegram_id || '').toLowerCase().includes(normalizedSearch) ||
         String(u.telegram_username || '').toLowerCase().includes(normalizedSearch)
-    );
+    ).sort((first, second) => {
+        if (userSort === 'newest') return new Date(second.created_at).getTime() - new Date(first.created_at).getTime();
+        return userSort === 'balance-high-to-low'
+            ? Number(second.balance || 0) - Number(first.balance || 0)
+            : Number(first.balance || 0) - Number(second.balance || 0);
+    });
 
     return (
         <div className="space-y-6 relative">
@@ -214,6 +220,16 @@ export default function AdminUsersPage() {
                             className="w-full md:w-auto pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                     </div>
+                    <select
+                        aria-label="Sort users"
+                        value={userSort}
+                        onChange={(event) => setUserSort(event.target.value as 'newest' | 'balance-high-to-low' | 'balance-low-to-high')}
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="newest">Newest users first</option>
+                        <option value="balance-high-to-low">Balance: highest first</option>
+                        <option value="balance-low-to-high">Balance: lowest first</option>
+                    </select>
                     {/* Manual Add User is complex with Supabase Auth (requires admin API), usually invite only or manual db insert. keeping button as placeholder or for manual funding flow? */}
                 </div>
             </div>
@@ -366,6 +382,10 @@ export default function AdminUsersPage() {
                                 <div>
                                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Joined</p>
                                     <p className="font-semibold text-gray-900">{new Date(user.created_at).toLocaleDateString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Phone</p>
+                                    <p className="truncate font-semibold text-gray-900">{user.phone || '—'}</p>
                                 </div>
                                 <div className="col-span-2">
                                     <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Telegram</p>

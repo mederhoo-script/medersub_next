@@ -263,6 +263,8 @@ export default function DataPage() {
                 providerServiceID: plan.smeapiServiceID || plan.providerServiceID,
                 network,
                 planName: plan.dataPlan,
+                dataType: plan.dataType,
+                validity: plan.validity,
                 paymentSource,
                 portedNumber,
             };
