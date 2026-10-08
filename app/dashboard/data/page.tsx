@@ -405,7 +405,7 @@ export default function DataPage() {
                                     <strong className="mt-5 block text-center text-lg font-medium text-[#171d2a] sm:mt-7 sm:text-[20px]">{item.dataPlan}</strong>
                                     <span className="mt-4 block text-right text-sm font-bold text-[#202632] sm:mt-6 sm:text-[17px]">₦{amount.toLocaleString('en-NG', { minimumFractionDigits: 2 })}</span>
                                     {(isAirtelSme2 || (category === 'HOT' && item.dataType?.trim())) && <span className="mt-1 flex min-h-[12px] items-center justify-between gap-1">
-                                        {isAirtelSme2 && <span className="truncate text-[11px] font-medium text-amber-700">Works on eligible SIMs only</span>}
+                                        {isAirtelSme2 && <span className="truncate text-[9px] font-medium text-amber-700">Eligible SIMs only</span>}
                                         {category === 'HOT' && item.dataType?.trim() && <span className="shrink-0 text-[10px] font-semibold text-[#0965df]">{displayName(item.dataType.trim())}</span>}
                                     </span>}
                                 </button>;
