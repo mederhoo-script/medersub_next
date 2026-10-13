@@ -321,7 +321,6 @@ export async function POST(req: Request) {
                     service_id: serviceID,
                     provider,
                     inlomax_id: provider === 'inlomax' ? apiResponse.data?.id || null : null,
-                    service_id: serviceID,
                     plan_name: planName || null,
                     provider_service_id: body.providerServiceID || null,
                     meter_type: meterType ?? null,
