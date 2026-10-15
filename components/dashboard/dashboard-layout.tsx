@@ -6,6 +6,7 @@ import PushNotificationBootstrap from '@/components/dashboard/push-notification-
 import PhoneNumberPrompt from '@/components/dashboard/phone-number-prompt';
 import DashboardBackButton from '@/components/dashboard/dashboard-back-button';
 import AnnouncementPopup from '@/components/dashboard/announcement-popup';
+import FundingStatusChecker from '@/components/dashboard/funding-status-checker';
 
 export default function DashboardLayoutWrapper({ children }: { children: ReactNode }) {
     return (
@@ -26,6 +27,7 @@ export default function DashboardLayoutWrapper({ children }: { children: ReactNo
             <PushNotificationBootstrap />
             <PhoneNumberPrompt />
             <AnnouncementPopup />
+            <FundingStatusChecker />
         </div>
     );
 }

@@ -71,6 +71,8 @@ export default function DashboardPage() {
             }
         };
         fetchProfile();
+        window.addEventListener('medersub:wallet-updated', fetchProfile);
+        return () => window.removeEventListener('medersub:wallet-updated', fetchProfile);
     }, []);
 
     useEffect(() => {

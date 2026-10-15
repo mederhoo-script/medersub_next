@@ -1,10 +1,12 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Copy, CreditCard, ArrowLeft, ShieldCheck, HelpCircle, Loader2, MessageCircle, CheckCircle2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import Script from 'next/script';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+
+const QUICK_FUNDING_AMOUNTS = [500, 1000, 2000, 5000, 10000];
 
 declare global {
     interface Window {
@@ -24,6 +26,7 @@ export default function FundWalletPage() {
     const [accountCopyStatus, setAccountCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
     const [accountLoading, setAccountLoading] = useState(false);
     const [koraError, setKoraError] = useState<string>('');
+    const [koraErrorCode, setKoraErrorCode] = useState<string | null>(null);
     const [hasBvn, setHasBvn] = useState(true);
     const [squadCustomerDetails, setSquadCustomerDetails] = useState({ fullName: '', bvn: '', dateOfBirth: '', gender: '', mobileNumber: '', address: '' });
     const [squadConfiguredDefaults, setSquadConfiguredDefaults] = useState({ defaultAccountReady: false, fullName: false, bvn: false, phone: false, dateOfBirth: false, gender: false, address: false });
@@ -31,6 +34,7 @@ export default function FundWalletPage() {
     const [showSquadDetailsForm, setShowSquadDetailsForm] = useState(false);
     const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [fundingResult, setFundingResult] = useState<{ type: 'success' | 'error' | 'pending'; title: string; message: string; grossAmount?: number; fee?: number; creditedAmount?: number } | null>(null);
+    const cancelFundingCheckRef = useRef<(() => void) | null>(null);
 
     // Config - Should be in ENV used by component or public constant
     const MONNIFY_API_KEY = process.env.NEXT_PUBLIC_MONNIFY_API_KEY || 'MK_TEST_PLACEHOLDER';
@@ -101,9 +105,15 @@ export default function FundWalletPage() {
                                 setKoraError('');
                                 return;
                             }
-                            const message = accountData?.error || 'Failed to auto-create your KoraPay account.';
-                            console.error('[fund-page] Auto create KoraPay account failed:', message);
+                            const isNetworkFailure = String(accountData?.error || '').toLowerCase() === 'fetch failed';
+                            const message = isNetworkFailure
+                                ? 'KoraPay account service is temporarily unavailable. Please try again shortly.'
+                                : accountData?.error || 'Failed to auto-create your KoraPay account.';
+                            if (accountData?.code !== 'KORAPAY_VIRTUAL_ACCOUNT_UNAVAILABLE') {
+                                console.warn('[fund-page] Auto create KoraPay account unavailable:', isNetworkFailure ? 'Network request failed.' : message);
+                            }
                             setKoraError(message);
+                            setKoraErrorCode(accountData?.code || null);
                         } else {
                             setVirtualAccount(accountData.virtualAccount || null);
                         }
@@ -137,72 +147,116 @@ export default function FundWalletPage() {
     useEffect(() => {
         if (provider !== 'korapay') return;
         let cancelled = false;
+        const controller = new AbortController();
+        const cancelCheck = () => {
+            cancelled = true;
+            controller.abort();
+            setCheckoutLoading(false);
+        };
+        cancelFundingCheckRef.current = cancelCheck;
 
         const pollPendingCheckouts = async () => {
             try {
-                const pendingResponse = await fetch('/api/payments/korapay/checkout/verify', { cache: 'no-store' });
+                const pendingResponse = await fetch('/api/payments/korapay/checkout/verify', { cache: 'no-store', signal: controller.signal });
                 const pendingData = await pendingResponse.json();
                 if (!pendingResponse.ok) throw new Error(pendingData.error || 'Unable to check pending payments.');
 
-                const expiryFallback = Date.now() + 20 * 60 * 1000;
                 const attempts = new Map<string, number>();
                 for (const item of pendingData.pending || []) {
-                    if (item.reference) attempts.set(String(item.reference), Date.parse(item.expiresAt) || expiryFallback);
+                    if (item.reference) {
+                        const createdAt = Date.parse(item.createdAt);
+                        attempts.set(String(item.reference), Number.isFinite(createdAt) ? createdAt + 20 * 60 * 1000 : Date.now() + 20 * 60 * 1000);
+                    }
                 }
                 const params = new URLSearchParams(window.location.search);
                 const returnedReference = params.get('payment') === 'korapay' ? params.get('reference') : null;
-                if (returnedReference && !attempts.has(returnedReference)) attempts.set(returnedReference, expiryFallback);
+                if (returnedReference && !attempts.has(returnedReference)) attempts.set(returnedReference, Date.now() + 20 * 60 * 1000);
                 if (attempts.size === 0) return;
 
-                setCheckoutLoading(true);
-                setFundingResult({ type: 'pending', title: 'Checking payment status', message: 'KoraPay is confirming your payment. We will keep checking for up to 20 minutes.' });
+                const hasActiveAttempt = [...attempts.values()].some((expiresAt) => expiresAt > Date.now());
+                if (hasActiveAttempt) {
+                    setCheckoutLoading(true);
+                    setFundingResult({ type: 'pending', title: 'Checking payment status', message: `Checking ${attempts.size} funding attempt${attempts.size === 1 ? '' : 's'} until KoraPay confirms their status.` });
+                }
 
                 const unresolved = new Set(attempts.keys());
+                let verifiedSuccess: { grossAmount?: number; fee?: number; creditedAmount?: number } | null = null;
+                let successDisplayed = false;
+                let firstPass = true;
                 while (!cancelled && unresolved.size > 0) {
                     const now = Date.now();
                     const references = [...unresolved];
                     const results = await Promise.all(references.map(async (reference) => {
-                        const expiresAt = attempts.get(reference) || now;
-                        if (now >= expiresAt) return { reference, expired: true as const };
+                        if (!firstPass && now >= (attempts.get(reference) || now)) return { reference, expired: true as const };
                         try {
                             const response = await fetch('/api/payments/korapay/checkout/verify', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ reference }),
+                                signal: controller.signal,
                             });
                             const data = await response.json();
-                            if (response.status === 404 || response.status === 403) return { reference, error: data.error || 'Payment reference could not be verified.' };
+                            if (response.status === 404 && Date.now() >= (attempts.get(reference) || Date.now())) {
+                                return { reference, expired: true as const };
+                            }
+                            if (!response.ok && response.status < 500) {
+                                return {
+                                    reference,
+                                    error: `${data.error || 'Payment reference could not be verified.'} (Ref: ${reference})`,
+                                };
+                            }
                             if (!response.ok) return { reference, retry: true as const };
                             if (data.status === 'credited' || data.status === 'duplicate' || data.creditedAmount) return { reference, success: data };
-                            if (['failed', 'cancelled'].includes(String(data.status).toLowerCase())) return { reference, failed: data.status };
+                            if (['failed', 'cancelled', 'canceled'].includes(String(data.status).toLowerCase())) return { reference, failed: data.status };
                             if (String(data.status).toLowerCase() === 'expired') return { reference, expired: true as const };
                             return { reference, retry: true as const };
-                        } catch {
+                        } catch (error) {
+                            if (!controller.signal.aborted) {
+                                console.warn('[fund-page] KoraPay verification request failed', {
+                                    reference,
+                                    message: error instanceof Error ? error.message : String(error),
+                                });
+                            }
                             return { reference, retry: true as const };
                         }
                     }));
 
+                    if (cancelled) break;
+
                     let keepChecking = false;
+                    let hasTerminalResult = false;
                     for (const result of results) {
+                        if (cancelled) break;
                         if ('success' in result) {
                             unresolved.delete(result.reference);
-                            setFundingResult({ type: 'success', title: 'Wallet funded successfully', message: 'Your payment was verified securely.', grossAmount: Number(result.success.grossAmount), fee: Number(result.success.fee), creditedAmount: Number(result.success.creditedAmount) });
+                            verifiedSuccess = result.success;
                         } else if ('failed' in result) {
                             unresolved.delete(result.reference);
-                            setFundingResult({ type: 'error', title: 'Payment not completed', message: `KoraPay payment status: ${result.failed}.` });
+                            hasTerminalResult = true;
+                            if (!verifiedSuccess) setFundingResult({ type: 'error', title: 'Payment not completed', message: `KoraPay payment status: ${result.failed}.` });
                         } else if ('error' in result) {
                             unresolved.delete(result.reference);
-                            setFundingResult({ type: 'error', title: 'Payment could not be verified', message: result.error });
+                            hasTerminalResult = true;
+                            if (!verifiedSuccess) setFundingResult({ type: 'error', title: 'Payment could not be verified', message: String(result.error || 'Payment reference could not be verified.') });
                         } else if ('expired' in result) {
                             unresolved.delete(result.reference);
-                            setFundingResult({ type: 'pending', title: 'Payment still processing', message: 'KoraPay has not confirmed this payment within 20 minutes. If your account was debited, its webhook can still update your wallet; contact support with your payment reference if it does not.' });
                         } else {
                             keepChecking = true;
                         }
                     }
 
+                    if (verifiedSuccess && !successDisplayed) {
+                        setFundingResult({ type: 'success', title: 'Wallet funded successfully', message: 'Your payment was verified securely.', grossAmount: Number(verifiedSuccess.grossAmount), fee: Number(verifiedSuccess.fee), creditedAmount: Number(verifiedSuccess.creditedAmount) });
+                        successDisplayed = true;
+                    }
+
+                    if (unresolved.size === 0 && !verifiedSuccess && !hasTerminalResult) setFundingResult(null);
+
+                    firstPass = false;
                     if (keepChecking && unresolved.size > 0 && !cancelled) {
-                        await new Promise((resolve) => window.setTimeout(resolve, 15000));
+                        const nextExpiry = Math.min(...[...unresolved].map((reference) => attempts.get(reference) || Date.now()));
+                        const delay = Math.min(15000, Math.max(0, nextExpiry - Date.now()));
+                        if (delay > 0) await new Promise((resolve) => window.setTimeout(resolve, delay));
                     }
                 }
             } catch (error) {
@@ -213,7 +267,11 @@ export default function FundWalletPage() {
         };
 
         void pollPendingCheckouts();
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            controller.abort();
+            if (cancelFundingCheckRef.current === cancelCheck) cancelFundingCheckRef.current = null;
+        };
     }, [provider]);
 
     const startKoraPayCheckout = async () => {
@@ -265,6 +323,7 @@ export default function FundWalletPage() {
     const retryCreateKoraAccount = async (accountMode: 'personal' | 'default' = 'personal') => {
         setAccountLoading(true);
         setKoraError('');
+        setKoraErrorCode(null);
         try {
             const accountRes = await fetch(`/api/payments/${provider}/account`, {
                 method: 'POST',
@@ -277,6 +336,7 @@ export default function FundWalletPage() {
                 const message = accountData?.error || 'Failed to create KoraPay account.';
                 console.error('[fund-page] Manual create KoraPay account failed:', message);
                 setKoraError(message);
+                setKoraErrorCode(accountData?.code || null);
                 return;
             }
 
@@ -442,7 +502,17 @@ export default function FundWalletPage() {
                             </div>
                         )}
                         <div className="px-6 pb-6">
-                            <button type="button" onClick={closeFundingResult} className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800">Close</button>
+                            {fundingResult.type === 'pending' ? (
+                                <>
+                                    <p className="mb-4 text-center text-xs text-slate-500">Stopping checks here does not cancel a payment already submitted to KoraPay.</p>
+                                    <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                                        <button type="button" onClick={() => { cancelFundingCheckRef.current?.(); setFundingResult(null); }} className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Stop checking</button>
+                                        <button type="button" onClick={() => setFundingResult(null)} className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800">{fundingResult.title === 'Payment still processing' ? 'Wait for provider update' : 'Keep waiting in background'}</button>
+                                    </div>
+                                </>
+                            ) : (
+                                <button type="button" onClick={closeFundingResult} className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800">Close</button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -533,6 +603,13 @@ export default function FundWalletPage() {
                     </div>
                     <div className="mb-6 space-y-3">
                         <input type="number" min="100" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount (₦)" className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none" />
+                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Quick funding amounts">
+                            {QUICK_FUNDING_AMOUNTS.map((quickAmount) => (
+                                <button key={quickAmount} type="button" aria-pressed={Number(amount) === quickAmount} onClick={() => setAmount(String(quickAmount))} className={`rounded-lg border px-2 py-2.5 text-sm font-semibold transition-colors ${Number(amount) === quickAmount ? 'border-blue-700 bg-blue-50 text-blue-800' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50'}`}>
+                                    ₦{quickAmount.toLocaleString('en-NG')}
+                                </button>
+                            ))}
+                        </div>
                         <button type="button" onClick={startKoraPayCheckout} disabled={checkoutLoading} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg disabled:opacity-60">
                             {checkoutLoading ? 'Opening checkout...' : 'Fund once with KoraPay'}
                         </button>
@@ -582,14 +659,15 @@ export default function FundWalletPage() {
                         <div className="space-y-3">
                             <div className="text-sm text-red-600">No virtual account is available yet.</div>
                             {koraError ? (
-                                <div className="text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg p-3">{koraError}</div>
+                                <div className="text-xs bg-red-50 border border-red-200 text-red-700 rounded-lg p-3" role="alert">{koraError}</div>
                             ) : null}
-                            {provider === 'squad' ? (
+                            {provider === 'squad' && (
                                 <div className="space-y-3">
                                     {!hasBvn && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">A personal account requires your own valid BVN. You can choose the configured default account if it is available.</div>}
                                     <button type="button" onClick={() => setShowSquadAccountChoice(true)} className="w-full rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700">Choose account type</button>
                                 </div>
-                            ) : (
+                            )}
+                            {provider !== 'squad' && koraErrorCode !== 'KORAPAY_VIRTUAL_ACCOUNT_UNAVAILABLE' && (
                                 <button onClick={() => void retryCreateKoraAccount()} disabled={accountLoading} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-60">
                                     Retry Account Creation
                                 </button>
@@ -610,6 +688,13 @@ export default function FundWalletPage() {
                                 placeholder="e.g. 1000"
                                 className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 outline-none"
                             />
+                            <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5" aria-label="Quick funding amounts">
+                                {QUICK_FUNDING_AMOUNTS.map((quickAmount) => (
+                                    <button key={quickAmount} type="button" aria-pressed={Number(amount) === quickAmount} onClick={() => setAmount(String(quickAmount))} className={`rounded-lg border px-2 py-2.5 text-sm font-semibold transition-colors ${Number(amount) === quickAmount ? 'border-blue-700 bg-blue-50 text-blue-800' : 'border-gray-200 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50'}`}>
+                                        ₦{quickAmount.toLocaleString('en-NG')}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="bg-amber-50 rounded-lg p-3 space-y-2">

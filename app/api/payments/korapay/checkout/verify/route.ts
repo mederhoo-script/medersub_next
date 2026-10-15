@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { getActivePaymentProvider } from '@/lib/payment-providers';
-import { getKoraPayCharge, normalizeAmount, normalizeCurrency } from '@/lib/korapay';
+import { getKoraPayCharge, KoraPayApiError, normalizeAmount, normalizeCurrency } from '@/lib/korapay';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 async function getCurrentUser() {
@@ -22,25 +22,30 @@ export async function GET() {
     const user = await getCurrentUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const createdAfter = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-    const { data, error } = await supabaseAdmin
-      .from('transactions')
-      .select('reference, amount, created_at')
-      .eq('user_id', user.id)
-      .eq('provider', 'korapay')
-      .eq('status', 'pending')
-      .contains('meta', { source: 'checkout', purpose: 'wallet-funding' })
-      .gte('created_at', createdAfter)
-      .order('created_at', { ascending: true })
-      .limit(10);
+    const pageSize = 1000;
+    const pendingTransactions: Array<{ reference: string; amount: number; created_at: string }> = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabaseAdmin
+        .from('transactions')
+        .select('reference, amount, created_at')
+        .eq('user_id', user.id)
+        .eq('provider', 'korapay')
+        .eq('status', 'pending')
+        .contains('meta', { source: 'checkout', purpose: 'wallet-funding' })
+        .order('created_at', { ascending: true })
+        .range(offset, offset + pageSize - 1);
 
-    if (error) throw error;
+      if (error) throw error;
+      const page = data || [];
+      pendingTransactions.push(...page);
+      if (page.length < pageSize) break;
+    }
+
     return NextResponse.json({
-      pending: (data || []).map((transaction) => ({
+      pending: pendingTransactions.map((transaction) => ({
         reference: transaction.reference,
         amount: transaction.amount,
         createdAt: transaction.created_at,
-        expiresAt: new Date(new Date(transaction.created_at).getTime() + 20 * 60 * 1000).toISOString(),
       })),
     });
   } catch (error) {
@@ -74,15 +79,26 @@ export async function POST(req: Request) {
       });
     }
     if (pendingTransaction.status !== 'pending') return NextResponse.json({ status: pendingTransaction.status || 'failed' });
-    if (Date.now() >= new Date(pendingTransaction.created_at).getTime() + 20 * 60 * 1000) {
-      return NextResponse.json({ status: 'expired' });
-    }
 
-    const charge = await getKoraPayCharge(reference);
+    let charge;
+    try {
+      charge = await getKoraPayCharge(reference);
+    } catch (error) {
+      if (error instanceof KoraPayApiError && error.status === 404) {
+        return NextResponse.json(
+          { status: 'not_found', error: 'KoraPay could not find this payment reference.' },
+          { status: 404 }
+        );
+      }
+      console.error('[korapay-checkout-verify] KoraPay lookup failed:', error instanceof Error ? error.message : String(error));
+      throw error;
+    }
     const data = charge.data || {};
     const providerStatus = String(data.status || '').toLowerCase();
+    const metadata = data.metadata || {};
+    const metadataUserId = metadata.userid || metadata.user_id;
     if (providerStatus !== 'success') {
-      if (['failed', 'cancelled', 'expired'].includes(providerStatus)) {
+      if (['failed', 'cancelled', 'canceled', 'expired'].includes(providerStatus)) {
         const { error: updateError } = await supabaseAdmin
           .from('transactions')
           .update({ status: 'failed', meta: { ...(pendingTransaction.meta as Record<string, unknown> || {}), provider_status: providerStatus } })
@@ -96,8 +112,6 @@ export async function POST(req: Request) {
     }
     if (data.currency && normalizeCurrency(data.currency) !== 'NGN') return NextResponse.json({ error: 'Invalid payment currency.' }, { status: 400 });
 
-    const metadata = data.metadata || {};
-    const metadataUserId = metadata.userid || metadata.user_id;
     if (metadataUserId !== user.id || metadata.purpose !== 'wallet-funding' || data.reference !== reference) {
       return NextResponse.json({ error: 'Payment does not belong to this account.' }, { status: 403 });
     }
@@ -121,6 +135,7 @@ export async function POST(req: Request) {
     if (error) throw error;
     return NextResponse.json({ success: true, grossAmount: amountAccepted, fee, creditedAmount, ...(result as Record<string, unknown>) });
   } catch (error) {
+    console.error('[korapay-checkout-verify] Verification failed', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed to verify KoraPay payment.' }, { status: 500 });
   }
 }

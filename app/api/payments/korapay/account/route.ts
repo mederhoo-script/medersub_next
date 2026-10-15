@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import { ensureWalletRow, getUserProfileName } from '@/lib/auth-helpers';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { createKoraPayVirtualAccount } from '@/lib/korapay';
+import { createKoraPayVirtualAccount, KoraPayApiError } from '@/lib/korapay';
 import { getActivePaymentProvider } from '@/lib/payment-providers';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -36,6 +36,10 @@ async function createKoraPayVirtualAccountWithRetry(payload: Record<string, any>
       return await createKoraPayVirtualAccount(payload);
     } catch (error: any) {
       lastError = error instanceof Error ? error : new Error(String(error || 'Unknown KoraPay error'));
+      if (error instanceof KoraPayApiError && error.status >= 400 && error.status < 500) {
+        console.warn(`[korapay-account] KoraPay rejected account creation (${error.status}):`, error.message);
+        break;
+      }
       console.error(`[korapay-account] create attempt ${attempt}/${maxAttempts} failed:`, lastError.message);
     }
   }
@@ -243,6 +247,16 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ virtualAccount });
   } catch (error: any) {
+    if (error instanceof KoraPayApiError && error.status === 403 && error.message.toLowerCase().includes('virtual bank account payment is not enabled')) {
+      console.warn('[korapay-account] Virtual accounts are not enabled for this merchant.');
+      return NextResponse.json(
+        {
+          error: 'KoraPay virtual accounts are not enabled for this merchant. Use the manual transfer details below or contact support.',
+          code: 'KORAPAY_VIRTUAL_ACCOUNT_UNAVAILABLE',
+        },
+        { status: 503 }
+      );
+    }
     console.error('[korapay-account] POST failed:', error?.message || error);
     return NextResponse.json({ error: error.message || 'Failed to create KoraPay virtual account.' }, { status: 500 });
   }

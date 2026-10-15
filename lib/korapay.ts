@@ -6,6 +6,13 @@ export type KoraPayProviderConfig = {
   baseUrl?: string;
 };
 
+export class KoraPayApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = 'KoraPayApiError';
+  }
+}
+
 export function getKoraPayConfig(): KoraPayProviderConfig {
   const secretKey = (process.env.KORAPAY_SECRET_KEY || process.env.KORAPAY_API_KEY || '').trim();
   const baseUrl = (process.env.KORAPAY_BASE_URL || 'https://api.korapay.com/merchant/api/v1').trim().replace(/\/+$/, '');
@@ -48,21 +55,6 @@ export async function korapayFetch<T>(path: string, init: RequestInit = {}): Pro
   headers.set('Content-Type', 'application/json');
   headers.set('Authorization', `Bearer ${secretKey}`);
 
-  const bodyText = typeof init.body === 'string' ? init.body : '';
-  const debugIsSandbox = /^sk_test_|^pk_test_/.test(secretKey);
-
-  if (debugIsSandbox) {
-    console.log('[korapay-debug] final request:', {
-      url: `${baseUrl}${path}`,
-      headers: {
-        Accept: headers.get('Accept'),
-        'Content-Type': headers.get('Content-Type'),
-        Authorization: 'Bearer [redacted]',
-      },
-      body: bodyText ? JSON.parse(bodyText) : null,
-    });
-  }
-
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers,
@@ -71,17 +63,8 @@ export async function korapayFetch<T>(path: string, init: RequestInit = {}): Pro
   const rawText = await response.text();
   const payload = rawText ? JSON.parse(rawText) : null;
 
-  if (process.env.NODE_ENV !== 'production') {
-    console.log('[korapay-debug] raw response:', {
-      status: response.status,
-      statusText: response.statusText,
-      payload,
-      rawText,
-    });
-  }
-
   if (!response.ok) {
-    throw new Error(payload?.message || `KoraPay request failed with status ${response.status}`);
+    throw new KoraPayApiError(payload?.message || `KoraPay request failed with status ${response.status}`, response.status);
   }
 
   return payload as T;
